@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "FLUSH PRIVILEGES;" | mysql -u root -p${MYSQL_ROOT_PASSWORD}

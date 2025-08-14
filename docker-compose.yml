@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    restart: unless-stopped
+    container_name: docreview-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+    networks:
+      - doc_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # image: sgcc/doc-review-backend:latest
+    image: doc-review-backend
+    container_name: docreview-backend
+    expose:
+      - "8000"
+    volumes:
+      - ./uploads:/sgcc/app/uploads
+    env_file:
+      - prod.env
+    # environment:
+    #   - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?charset=utf8mb4
+    #   - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - doc_network
+
+  agent:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: doc-review-backend
+    container_name: docreview-agent
+    command: fastapi run mock_agent_server.py --reload --port 8002
+    expose:
+      - "8002"
+    env_file:
+      - prod.env
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - doc_network
+
+  isc_auth:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: doc-review-backend
+    container_name: docreview-isc-auth
+    command: fastapi run mock_isc_auth.py --reload --port 8003
+    expose:
+      - "8003"
+    env_file:
+      - prod.env
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - doc_network
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: doc-review-backend
+    container_name: docreview-celery
+    env_file:
+      - prod.env
+    # environment:
+    #   - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?charset=utf8mb4
+    #   - REDIS_URL=redis://redis:6379/0
+    command: celery -A app.core worker -l INFO
+    volumes:
+      - ./uploads:/sgcc/app/uploads
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - doc_network
+
+  javadep:
+    build:
+      context: ./javadep
+      dockerfile: Dockerfile
+    image: doc-review-javadep
+    container_name: docreview-javadep
+    expose:
+      - 18092
+    volumes:
+      - ./javadep/application.yml:/app/application.yml
+    networks:
+      - doc_network
+
+
+  mysql:
+    image: mysql:5.7.44
+    container_name: docreview-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: sgcc@1234
+      MYSQL_DATABASE: threeone
+      # MYSQL_USER: user
+      # MYSQL_PASSWORD: sgcc@1234
+    expose:
+      - 3306
+    # ports:
+    #   - "3306:3306"
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ./init-mysql.sh:/docker-entrypoint-initdb.d/init-mysql.sh
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u", "root", "--password=sgcc@1234"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - doc_network
+
+  redis:
+    image: redis:alpine
+    container_name: docreview-redis
+    command: redis-server --port 16379 --requirepass sgcc@1234
+    expose:
+      - 16379
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    networks:
+      - doc_network
+
+networks:
+  doc_network:
+    driver: bridge

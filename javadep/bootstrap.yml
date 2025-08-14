@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: acloud-isc-token
+  cloud:
+    config:
+      enabled: false
+      discovery:
+        enabled: false   # 开启通过服务来访问Config Server的功能
+        service-id: acloud-config  # config server的服务名，用于多节点
+
+server:
+  port: 18092
+    
+acloud:
+  eureka:
+    username: aostarit
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://${acloud.eureka.username}@acloud-eureka:18002/eureka/
+    enabled: false  # 不注册注册中心
+  instance:
+    prefer-ip-address: true  #采用ip注册,指定hostname便无效

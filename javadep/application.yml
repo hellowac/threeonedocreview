@@ -1,0 +1,67 @@
+spring:
+  mvc:
+    favicon:
+      enabled: false
+    servlet:
+      load-on-startup: 1
+      
+  thymeleaf:
+    cache: false
+  
+  # redis 做缓存，要更改
+  redis:
+    database: 8
+    host: redis
+    # 端口也不能用默认的
+    port: 16379
+    # 必须要密码
+    password: sgcc@1234
+
+  session:
+    store-type: redis
+    
+  autoconfigure:
+    exclude:
+    - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+    - com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure
+    
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/acloud?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false
+    username: acloud
+    password: acloud
+    druid:
+      max-active: 8
+      initial-size: 0
+
+# isc 要更新
+# 注册的app_id 更新
+isc:
+  # 请求资源时，才用，暂时不用。
+  app-id: ff8080817140c2560174479d4c3d2087
+  api:
+    # 生产isc请求地址，访问权限
+    # service-url-prefix: http://10.215.212.88:7010/isc_frontmv_serv
+    # http://localhost:18092/isc_frontmv_serv
+    service-url-prefix: http://isc-sso.qh.sgcc.com.cn/isc_frontmv_serv
+  sso:
+    # isc登录。
+    service-url-prefix: http://10.215.212.88:7010/isc_sso/
+    # 项目服务地址，向isc注册时，提供的地址。
+    redirect-uri: http://10.215.182.190:80
+    
+  mock:
+    enabled: false
+    users:
+      acloud:
+        isc-user-id: 197d7bbdf2b1482e8bfcd123ac076a1b
+        isc-user-source-id: acloud
+        name: acloud
+        
+  session:
+    enabled: false
+
+acloud:
+  spring:
+    cors:
+      enabled: true     

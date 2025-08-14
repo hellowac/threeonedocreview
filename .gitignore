@@ -1,0 +1,8 @@
+*.tar
+*.zip
+.DS_Store
+*.pyc
+__pycache__
+uploads
+mysql_data
+redis_data
