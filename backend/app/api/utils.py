@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from io import BytesIO
 
 import alibabacloud_oss_v2 as oss
 import requests
@@ -16,6 +17,7 @@ from app.api.schems import (
 from app.core.config import settings
 from app.models.agentsetting import AgentSetting
 
+# ------ 本地保存文件相关 -------------
 
 def save_document_to_local(uploadfile: UploadFile) -> str:
     upload_dir = settings.UPLOAD_FILES_DIR / datetime.now().strftime("%Y%m%d")
@@ -34,6 +36,28 @@ def save_document_to_local(uploadfile: UploadFile) -> str:
 
     return relative_filepath
 
+# --------- oss 处理文件相关 -----------------
+
+def get_oss_client():
+    """ 获取oss客户端 """
+
+    region = settings.OSS_ACCESS_REGION  # "cn-hangzhou"
+
+    # 加载凭证
+    credentials_provider = oss.credentials.StaticCredentialsProvider(
+        settings.OSS_ACCESS_KEY_ID, settings.OSS_ACCESS_KEY_SECRET
+    )
+
+    # 使用 SDK 的默认配置
+    cfg = oss.config.load_default()
+    cfg.credentials_provider = credentials_provider
+    cfg.region = region
+    cfg.endpoint = settings.OSS_ACCESS_ENDPOINT
+
+    client = oss.Client(cfg)
+
+    return client
+
 
 def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
     """上传文档至阿里云OSS存储
@@ -49,7 +73,6 @@ def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
     if uploadfile.filename is None:
         raise ValueError("文件名为空")
 
-    region = settings.OSS_ACCESS_REGION  # "cn-hangzhou"
     bucket_name = settings.OSS_ACCESS_BUCKET  # "your bucket name"
 
     day = datetime.now().strftime("%Y%M%d")
@@ -59,18 +82,7 @@ def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
 
     logger.info(f"上传文件到OSS: {object_name}")
 
-    # 加载凭证
-    credentials_provider = oss.credentials.StaticCredentialsProvider(
-        settings.OSS_ACCESS_KEY_ID, settings.OSS_ACCESS_KEY_SECRET
-    )
-
-    # 使用 SDK 的默认配置
-    cfg = oss.config.load_default()
-    cfg.credentials_provider = credentials_provider
-    cfg.region = region
-    cfg.endpoint = settings.OSS_ACCESS_ENDPOINT
-
-    client = oss.Client(cfg)
+    client = get_oss_client()
 
     result = client.put_object(
         oss.PutObjectRequest(
@@ -80,9 +92,43 @@ def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
         )
     )
 
-    print(f"oss推送文件成功, ETag {result.etag}")
+    logger.info(f"oss推送文件成功, ETag {result.etag}")
 
     return str(object_name)
+
+def download_document_from_oss(object_name: str) -> BytesIO:
+    """ 从oss下载文件
+
+    文档参考：
+
+        https://help.aliyun.com/zh/oss/developer-reference/simple-download-using-oss-sdk-for-python-v2
+    """
+
+    bucket_name = settings.OSS_ACCESS_BUCKET  # "your bucket name"
+
+    logger.info(f"从OSS下载文件: {object_name}")
+
+    client = get_oss_client()
+
+    # 执行获取对象的请求，指定存储空间名称和对象名称
+    result = client.get_object(oss.GetObjectRequest(
+        bucket=bucket_name,  # 指定存储空间名称
+        key=object_name,  # 指定对象键名
+    ))
+
+    # ========== 方式1：完整读取 ==========
+    filecontent = BytesIO(b'')
+    with result.body as body_stream: # type: ignore
+        data = body_stream.read()
+        logger.info(f"文件读取完成，数据长度：{len(data)} bytes")
+        filecontent.write(data)
+        logger.info("文件下载完成，保存至BytesIO")
+
+    filecontent.seek(0)
+
+    return filecontent
+
+# --------- agent session 相关操作 ------------------
 
 
 def create_agent_session( agent_setting: AgentSetting) -> str:

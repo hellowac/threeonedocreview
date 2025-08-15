@@ -49,7 +49,8 @@ def delete_agentsettings(engine: Engine) -> None:
 def main() -> None:
     logger.info("Initializing service")
     init(engine)
-    delete_agentsettings(engine)
+    # 2025-08-14 16:28:02 注释掉，这里是要更新表的结构，所以删除的旧的设置数据。
+    # delete_agentsettings(engine)
     logger.info("Service finished initializing")
 
 

@@ -27,7 +27,11 @@ from sqlmodel import col, desc, func, select
 
 from app.api.const import MEDIA_TYPE_MAP
 from app.api.deps import SaveTypeDep, SessionDep, UserinfoDep
-from app.api.utils import save_document_to_local, save_document_to_oss
+from app.api.utils import (
+    download_document_from_oss,
+    save_document_to_local,
+    save_document_to_oss,
+)
 from app.core.config import settings
 from app.crud.documents import get_or_create_project
 
@@ -439,7 +443,7 @@ class DocumentRoute:
             # 保存到本地
             if save_type == SaveType.LOCAL:
                 save_path = save_document_to_local(uploadfile)
-            else:
+            else: # oss
                 save_path = save_document_to_oss(proj_type.name, uploadfile)
 
             document_in = DocumentCreate(
@@ -555,17 +559,25 @@ class DocumentRoute:
         if document.is_delete:
             raise HTTPException(400, "该文件已被删除")
 
-        if document.save_type == SaveType.OSS:
-            raise HTTPException(400, "不支持OSS存储的文件下载")
-
-        absolute_filepath = str(settings.UPLOAD_FILES_DIR / document.save_path)
-
         media_type = MEDIA_TYPE_MAP.get(document.file_suffix)
 
-        def iter_file_content() -> Generator[bytes, Any, None]:
+        if document.save_type == SaveType.LOCAL:
+            absolute_filepath = str(settings.UPLOAD_FILES_DIR / document.save_path)
 
+            # def iter_file_content() -> Generator[bytes, Any, None]:
+
+            #     with open(absolute_filepath, 'rb') as fr:
+            #         yield from fr
+
+            filecontent = BytesIO(b'')
             with open(absolute_filepath, 'rb') as fr:
-                yield from fr
+                filecontent.write(fr.read())
+
+            filecontent.seek(0)
+
+        else:
+            logger.info(f"从OSS存储的文件下载, object_name: {document.save_path}")
+            filecontent = download_document_from_oss(document.save_path)
 
         headers : dict[str, str] = {}
         headers["Content-Disposition"] = f"attachment; filename={document.file_name}"
@@ -573,7 +585,7 @@ class DocumentRoute:
         if media_type:
             headers["Content-Type"] = media_type # "application/octet-stream"
 
-        return StreamingResponse(iter_file_content(), media_type=media_type)
+        return StreamingResponse(filecontent, media_type=media_type)
 
 
 class DocumentContentRoute:
