@@ -1,12 +1,14 @@
 import os
 from datetime import datetime
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
 
 import alibabacloud_oss_v2 as oss
+import oss2
 import requests
 from fastapi import UploadFile
 from loguru import logger
+from oss2.credentials import StaticCredentialsProvider
 
 from app.api.schems import (
     ClearSessionPayload,
@@ -36,9 +38,73 @@ def save_document_to_local(uploadfile: UploadFile) -> str:
 
     return relative_filepath
 
-# --------- oss 处理文件相关 -----------------
+# --------- oss v1 处理文件相关 -----------------
+# https://help.aliyun.com/zh/oss/developer-reference/getting-started-with-oss-sdk-for-python
 
-def get_oss_client():
+def get_oss_v1_bucket() -> oss2.Bucket:
+    """ 获取oss v1 版本的bucket 
+
+    文档参考:
+
+        https://help.aliyun.com/zh/oss/developer-reference/getting-started-with-oss-sdk-for-python
+    """
+
+    endpoint = settings.OSS_ACCESS_ENDPOINT
+    bucket_name = settings.OSS_ACCESS_BUCKET
+    auth = oss2.ProviderAuthV4(StaticCredentialsProvider(access_key_id=settings.OSS_ACCESS_KEY_ID, access_key_secret=settings.OSS_ACCESS_KEY_SECRET))
+
+    return oss2.Bucket(auth, endpoint, bucket_name, region='')
+
+def save_document_to_oss_v1(proj_type: str, uploadfile: UploadFile) -> str:
+    """上传文档至阿里云OSS存储
+
+    文档参考:
+
+        https://help.aliyun.com/zh/oss/developer-reference/getting-started-with-oss-sdk-for-python
+
+        仓库:
+
+        https://github.com/aliyun/aliyun-oss-python-sdk
+    """
+    if uploadfile.filename is None:
+        raise ValueError("文件名为空")
+
+    day = datetime.now().strftime("%Y%M%d")
+    object_name = str(
+        Path(settings.OSS_STORE_PATH) / proj_type / day / uploadfile.filename
+    )  # "your object name"
+
+    logger.info(f"上传文件到OSS: {object_name}")
+
+    bucket = get_oss_v1_bucket()
+
+    result = bucket.put_object(object_name, uploadfile.file)
+
+    logger.info(f"oss推送文件成功, ETag {result.etag}")
+
+    return str(object_name)
+
+def download_document_from_oss_v1(object_name: str) -> BytesIO:
+    """ 从oss下载文件
+
+    文档参考：
+
+        https://help.aliyun.com/zh/oss/developer-reference/getting-started-with-oss-sdk-for-python
+    """
+
+    logger.info(f"从OSS下载文件: {object_name}")
+
+    bucket = get_oss_v1_bucket()
+
+    # 执行获取对象的请求，指定存储空间名称和对象名称
+    file_obj = bucket.get_object(object_name)
+    filecontent = BytesIO(file_obj.read()) # type: ignore
+    filecontent.seek(0)
+    return filecontent
+
+# --------- oss v2 处理文件相关 -----------------
+
+def get_oss_v2_client() -> oss.Client:
     """ 获取oss客户端 """
 
     region = settings.OSS_ACCESS_REGION  # "cn-hangzhou"
@@ -59,7 +125,7 @@ def get_oss_client():
     return client
 
 
-def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
+def save_document_to_oss_v2(proj_type: str, uploadfile: UploadFile) -> str:
     """上传文档至阿里云OSS存储
 
     文档参考:
@@ -82,7 +148,7 @@ def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
 
     logger.info(f"上传文件到OSS: {object_name}")
 
-    client = get_oss_client()
+    client = get_oss_v2_client()
 
     result = client.put_object(
         oss.PutObjectRequest(
@@ -96,7 +162,7 @@ def save_document_to_oss(proj_type: str, uploadfile: UploadFile) -> str:
 
     return str(object_name)
 
-def download_document_from_oss(object_name: str) -> BytesIO:
+def download_document_from_oss_v2(object_name: str) -> BytesIO:
     """ 从oss下载文件
 
     文档参考：
@@ -108,7 +174,7 @@ def download_document_from_oss(object_name: str) -> BytesIO:
 
     logger.info(f"从OSS下载文件: {object_name}")
 
-    client = get_oss_client()
+    client = get_oss_v2_client()
 
     # 执行获取对象的请求，指定存储空间名称和对象名称
     result = client.get_object(oss.GetObjectRequest(

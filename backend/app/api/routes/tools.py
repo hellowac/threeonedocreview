@@ -7,7 +7,7 @@ from loguru import logger
 from sqlmodel import col, desc, func, select
 
 from app.api.deps import SaveTypeDep, SessionDep, UserinfoDep
-from app.api.utils import save_document_to_local, save_document_to_oss
+from app.api.utils import save_document_to_local, save_document_to_oss_v2
 from app.models.enums import SaveType
 
 # 文档及内容的模型
@@ -86,7 +86,7 @@ class ToolRoute:
         if save_type == SaveType.LOCAL:
             save_path = save_document_to_local(docx_file)
         else:
-            save_path = save_document_to_oss("parsedfile", docx_file)
+            save_path = save_document_to_oss_v2("parsedfile", docx_file)
 
         parsedfile = ParsedFile(
             iscuser_id=uinfo.id,

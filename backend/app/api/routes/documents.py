@@ -28,9 +28,9 @@ from sqlmodel import col, desc, func, select
 from app.api.const import MEDIA_TYPE_MAP
 from app.api.deps import SaveTypeDep, SessionDep, UserinfoDep
 from app.api.utils import (
-    download_document_from_oss,
+    download_document_from_oss_v1,
     save_document_to_local,
-    save_document_to_oss,
+    save_document_to_oss_v1,
 )
 from app.core.config import settings
 from app.crud.documents import get_or_create_project
@@ -444,7 +444,7 @@ class DocumentRoute:
             if save_type == SaveType.LOCAL:
                 save_path = save_document_to_local(uploadfile)
             else: # oss
-                save_path = save_document_to_oss(proj_type.name, uploadfile)
+                save_path = save_document_to_oss_v1(proj_type.name, uploadfile)
 
             document_in = DocumentCreate(
                 file_name=uploadfile.filename,  # type: ignore
@@ -577,7 +577,7 @@ class DocumentRoute:
 
         else:
             logger.info(f"从OSS存储的文件下载, object_name: {document.save_path}")
-            filecontent = download_document_from_oss(document.save_path)
+            filecontent = download_document_from_oss_v1(document.save_path)
 
         headers : dict[str, str] = {}
         headers["Content-Disposition"] = f"attachment; filename={document.file_name}"
