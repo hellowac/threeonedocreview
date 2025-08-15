@@ -51,9 +51,11 @@ def get_oss_v1_bucket() -> oss2.Bucket:
 
     endpoint = settings.OSS_ACCESS_ENDPOINT
     bucket_name = settings.OSS_ACCESS_BUCKET
-    auth = oss2.ProviderAuthV4(StaticCredentialsProvider(access_key_id=settings.OSS_ACCESS_KEY_ID, access_key_secret=settings.OSS_ACCESS_KEY_SECRET))
 
-    return oss2.Bucket(auth, endpoint, bucket_name, region='')
+    # 内网调用的自定义endpoint,不适用官网的示例，这里只要最基础的验证就可以了。
+    auth = oss2.Auth(access_key_id=settings.OSS_ACCESS_KEY_ID, access_key_secret=settings.OSS_ACCESS_KEY_SECRET)
+
+    return oss2.Bucket(auth, endpoint, bucket_name)
 
 def save_document_to_oss_v1(proj_type: str, uploadfile: UploadFile) -> str:
     """上传文档至阿里云OSS存储

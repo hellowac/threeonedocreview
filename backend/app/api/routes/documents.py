@@ -575,6 +575,7 @@ class DocumentRoute:
 
             filecontent.seek(0)
 
+        # oss存储
         else:
             logger.info(f"从OSS存储的文件下载, object_name: {document.save_path}")
             filecontent = download_document_from_oss_v1(document.save_path)

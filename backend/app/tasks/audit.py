@@ -1,5 +1,6 @@
 import base64
 import uuid
+from io import BytesIO
 
 import pymupdf
 import requests
@@ -9,6 +10,7 @@ from pymupdf import Document
 from sqlmodel import Session
 
 from app.api.schems import PdfOcrResResponse
+from app.api.utils import download_document_from_oss_v1
 from app.core import celery_app
 from app.core.config import settings
 from app.core.db import engine
@@ -17,7 +19,7 @@ from app.mydocx.entry import Extract, RenderFormat
 from app.tasks.common import cur_time, review_err, save_docx_shtml_to_db
 
 
-def pdf2png2text(filepath: str, proj_name: str, proj_version: int) -> tuple[str , str]:
+def pdf2png2text(filepath: str | BytesIO, proj_name: str, proj_version: int) -> tuple[str , str]:
     """ pdf文件转PNG再调用OCR识别出文本，并返回
 
     参考接口文档:
@@ -108,39 +110,44 @@ def audit_scan_pdf(
     process_msgs.append(f"{cur_time()} - {msg}")
     logger.info(msg)
 
+    # 本地存储
     if save_type == SaveType.LOCAL:
 
-        absolute_filepath = str(settings.UPLOAD_FILES_DIR / filepath)
+        absolute_filepath: str | BytesIO = str(settings.UPLOAD_FILES_DIR / filepath)
 
         msg = f"项目:【{proj_name}】【第{proj_version}次提交】本地文件绝对地址: {absolute_filepath}"
         process_msgs.append(f"{cur_time()} - {msg}")
         logger.info(msg)
 
-        with Session(bind=engine) as session:
-            pdf_text, _process_msg = pdf2png2text(absolute_filepath, proj_name, proj_version)
-
-            process_msgs.append(_process_msg)
-
-            review_taskid, _process_msg = save_docx_shtml_to_db(
-                session,
-                proj_name,
-                uuid.UUID(proj_id),
-                proj_version,
-                uuid.UUID(doc_id),
-                iscuser_id,
-                pdf_text,
-            )
-
-            process_msgs.append(_process_msg)
-
-
-            msg = f"项目:【{proj_name}】【第{proj_version}次提交】保存文件内容完成"
-            process_msgs.append(f"{cur_time()} - {msg}")
-            logger.info(msg)
-
+    # oss 存储
     else:
-        # [ ] 支持云盘的pdf文件审查
-        raise Exception(f"暂不支持云盘的文件审查: {filepath =}")
+        absolute_filepath = download_document_from_oss_v1(filepath)
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】OSS存储地址: {filepath}"
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
+
+    with Session(bind=engine) as session:
+        pdf_text, _process_msg = pdf2png2text(absolute_filepath, proj_name, proj_version)
+
+        process_msgs.append(_process_msg)
+
+        review_taskid, _process_msg = save_docx_shtml_to_db(
+            session,
+            proj_name,
+            uuid.UUID(proj_id),
+            proj_version,
+            uuid.UUID(doc_id),
+            iscuser_id,
+            pdf_text,
+        )
+
+        process_msgs.append(_process_msg)
+
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】保存文件内容完成"
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
 
     return "\n".join(process_msgs)
 
@@ -170,43 +177,47 @@ def audit_docx(
 
     if save_type == SaveType.LOCAL:
 
-        absolute_filepath = str(settings.UPLOAD_FILES_DIR / filepath)
+        absolute_filepath: str|BytesIO = str(settings.UPLOAD_FILES_DIR / filepath)
 
         msg = f"项目:【{proj_name}】【第{proj_version}次提交】本地文件绝对地址: {absolute_filepath}"
         process_msgs.append(f"{cur_time()} - {msg}")
         logger.info(msg)
 
-        with Session(bind=engine) as session:
-
-            msg = f"项目:【{proj_name}】【第{proj_version}次提交】开始解析docx文件..."
-            process_msgs.append(f"{cur_time()} - {msg}")
-            logger.info(msg)
-
-            parser = Extract(absolute_filepath, use_oss=False)
-            docx_shtml = parser.parse(render_format=RenderFormat.txt)
-
-            msg = f"项目:【{proj_name}】【第{proj_version}次提交】解析docx文件完成"
-            process_msgs.append(f"{cur_time()} - {msg}")
-            logger.info(msg)
-
-            review_taskid, _process_msg = save_docx_shtml_to_db(
-                session,
-                proj_name,
-                uuid.UUID(proj_id),
-                proj_version,
-                uuid.UUID(doc_id),
-                iscuser_id,
-                docx_shtml,
-            )
-
-            process_msgs.append(_process_msg)
-
-            msg = f"项目:【{proj_name}】【第{proj_version}次提交】保存文件内容完成"
-            process_msgs.append(f"{cur_time()} - {msg}")
-            logger.info(msg)
-
+    # oss 存储
     else:
-        # [ ] 支持云盘的docx文件审查
-        raise Exception(f"暂不支持云盘的文件审查: {filepath =}")
+        absolute_filepath = download_document_from_oss_v1(filepath)
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】OSS存储地址: {filepath}"
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
+
+    with Session(bind=engine) as session:
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】开始解析docx文件..."
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
+
+        parser = Extract(absolute_filepath, use_oss=False)
+        docx_shtml = parser.parse(render_format=RenderFormat.txt)
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】解析docx文件完成"
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
+
+        review_taskid, _process_msg = save_docx_shtml_to_db(
+            session,
+            proj_name,
+            uuid.UUID(proj_id),
+            proj_version,
+            uuid.UUID(doc_id),
+            iscuser_id,
+            docx_shtml,
+        )
+
+        process_msgs.append(_process_msg)
+
+        msg = f"项目:【{proj_name}】【第{proj_version}次提交】保存文件内容完成"
+        process_msgs.append(f"{cur_time()} - {msg}")
+        logger.info(msg)
 
     return "\n".join(process_msgs)
