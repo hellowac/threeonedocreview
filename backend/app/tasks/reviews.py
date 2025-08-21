@@ -7,7 +7,7 @@ import requests  # type: ignore
 from celery import Task  # type: ignore
 from loguru import logger
 from requests.models import Response as RequestsResponse
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from app.api.schems import AgentResponseModel, RunAgentMessagePayload, RunAgentPayload
 from app.api.utils import (
@@ -27,6 +27,7 @@ from app.models.documents import (
 )
 from app.models.enums import (
     AgentType,
+    FileCategory,
     ForSection,
     ProjectTypeEnum,
     ReviewStatus,
@@ -182,7 +183,7 @@ def review_by_agent(
                         doc_content,
                         dcontent_map,
                         review_proj_type,
-                        review_section,   # type: ignore
+                        review_section,  # type: ignore
                     )
 
                 if err_msg:
@@ -397,6 +398,9 @@ def request_remote_agent(
     contexted_message_json_str = "\n".join(context_messages)
     logger.info(f"审查内容: {contexted_message_json_str}")
 
+    # 获取附件内容。
+    attachment = get_attachment_from_db(session, proj)
+
     # -------- 该节的概述， 不需要了 ----------
 
     # 根据智能体设置请求审查相关section
@@ -431,7 +435,7 @@ def request_remote_agent(
 
     # 该message应为agent返回的文本, 从该文本中extract 问题/建议详细
     # agent_resp = post_agent_api(agent_setting, dcontent.suggestion)
-    agent_resp = post_agent_api(agent_setting, contexted_message_json_str)
+    agent_resp = post_agent_api(agent_setting, contexted_message_json_str, attachment=attachment)
 
     # 预期为json格式的数据: [{question: xxx, question_tag: xxx, ...}, ...]
     # {
@@ -500,6 +504,34 @@ def request_remote_agent(
     return dcontent, ";".join(err_msgs)
 
 
+def get_attachment_from_db(session: Session, proj: Project) -> str:
+    """获取指定项目的附件的内容。"""
+
+    statement = select(Document.id).where(
+        Document.proj_id == proj.id,
+        Document.proj_version == proj.version,
+        # or_(
+        #     Document.file_category == FileCategory.FEASIBIBITY,
+        #     Document.file_category == FileCategory.SURVEY,
+        #     Document.file_category == FileCategory.OTHER,
+        # ),
+        Document.file_category.in_(  # type: ignore
+            (FileCategory.FEASIBIBITY, FileCategory.SURVEY, FileCategory.OTHER)
+        ),
+    )
+    attchement_docs_id = list(session.exec(statement).all())
+
+    if not attchement_docs_id:
+        return ""
+
+    statement1 = select(DocumentContent.content).where(
+        DocumentContent.id.in_(attchement_docs_id) # type: ignore
+    )
+    dcs = list(session.exec(statement1).all())
+
+    return '\n'.join(dcs)
+
+
 # 文档/项目的概述：调用AI将多个suggestion提炼成1个suggestion
 def combine_ai_suggestion(session: Session, suggestions: list[str]) -> str:
     """将某个文档各个节的ai建议，合并，并提炼成一句话。"""
@@ -535,11 +567,16 @@ def get_agent_setting(
     return agent_setting
 
 
-def post_agent_api(agent_setting: AgentSetting, _message: str) -> AgentResponseModel:
+def post_agent_api(
+    agent_setting: AgentSetting,
+    _message: str,
+    attachment: str = "",
+    is_chat: bool = False,
+) -> AgentResponseModel:
     """请求智能体接口并返回结果"""
 
     url, headers, payload, session_id, resp = post_agent_api_core(
-        agent_setting, _message
+        agent_setting, _message, attachment=attachment, is_chat=is_chat
     )
 
     logger.info(f"调用agent 返回: {resp.text = }")
@@ -572,13 +609,18 @@ def parse_agent_raw_rasp(resp: RequestsResponse) -> AgentResponseModel:
 
 
 def post_agent_api_core(
-    agent_setting: AgentSetting, _message: str, timeout: float | None = None
+    agent_setting: AgentSetting,
+    _message: str,
+    attachment: str = "",
+    is_chat: bool = False,
+    timeout: float | None = None,
 ) -> tuple[str, dict, dict, str, RequestsResponse]:
     """请求智能体接口并返回结果
 
     Args:
         agent_setting (AgentSetting): 智能体设置实例。
         _message (str): 对话的内容。
+        attachment (str): 附件内容。
         timout (float): 超时时间， 单位为秒(S), 默认为None, 无超时限制。
 
     Returns:
@@ -603,7 +645,19 @@ def post_agent_api_core(
     # 创建1个新的session, 用于当前请求，防止上一个session_id执行超时后，影响后面的请求。
     new_session_id = create_agent_session(agent_setting)
 
-    message = RunAgentMessagePayload(text=_message)
+    # 封装agent需要的结构, 如果是智能体助手，则不需要。
+    if is_chat:
+        message = RunAgentMessagePayload(text=_message)
+
+    # agent 会用用json.loads 来加载数据。
+    else:
+        message = RunAgentMessagePayload(
+            text=json.dumps(
+                {"examine_content": _message, "attachment": attachment},
+                ensure_ascii=False,
+            )
+        )
+
     payload = RunAgentPayload(
         sessionId=new_session_id, stream=False, message=message
     ).model_dump(mode="json")

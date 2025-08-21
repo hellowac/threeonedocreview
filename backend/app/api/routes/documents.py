@@ -23,7 +23,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from sqlmodel import col, desc, func, select
+from sqlmodel import Session, col, desc, func, select
 
 from app.api.const import MEDIA_TYPE_MAP
 from app.api.deps import SaveTypeDep, SessionDep, UserinfoDep
@@ -368,6 +368,46 @@ class DocumentRoute:
 
         return public
 
+    # 处理文件
+    def process_upload_file(
+        self,
+        session: Session,
+        save_type: SaveType,
+        proj_type: ProjectTypeEnum,
+        project: Project,
+        iscuser_id: str,
+        uploadfile: UploadFile,
+        file_category: FileCategory,
+    ) -> Document:
+        # 提取 docx、pdf
+        file_suffix = ""
+        if uploadfile.filename is not None:
+            file_suffix = uploadfile.filename.rsplit(".")[-1]
+
+        # 保存到本地
+        if save_type == SaveType.LOCAL:
+            save_path = save_document_to_local(uploadfile)
+        else:  # oss
+            save_path = save_document_to_oss_v1(proj_type.name, uploadfile)
+
+        document = Document(
+            proj_id=project.id,
+            proj_version=project.version,
+            iscuser_id=iscuser_id,
+            file_name=uploadfile.filename,  # type: ignore
+            file_suffix=file_suffix,
+            file_size=uploadfile.size,  # type: ignore
+            file_category=file_category,
+            save_type=save_type,
+            save_path=save_path,
+        )
+
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        return document
+
     def create_document(
         self,
         session: SessionDep,
@@ -403,7 +443,6 @@ class DocumentRoute:
 
         # 搞到一个list中，好处理
         other_files = other_files or []
-        other_files.insert(0, threeone_file)
 
         other_files_category_map: dict[str | None, FileCategory] = {}
 
@@ -415,7 +454,7 @@ class DocumentRoute:
             logger.exception(e)
             raise HTTPException(status_code=500, detail="解析其他文件的分类字典失败.")
 
-        # 项目处理
+        # 获取项目信息
         project, proj_new_created = get_or_create_project(
             session, proj_name, proj_type, uinfo.id
         )
@@ -428,74 +467,81 @@ class DocumentRoute:
 
         documents = []
 
-        for index, uploadfile in enumerate(other_files, start=1):
+        appendix_files: list[dict] = []
+
+        # 处理附件
+        for uploadfile in other_files:
             file_category = other_files_category_map.get(
                 uploadfile.filename, FileCategory.OTHER
             )
-            if index == 1:
-                file_category = FileCategory.THREESTEP
 
-            # 提取 docx、pdf
-            file_suffix = ""
-            if uploadfile.filename is not None:
-                file_suffix = uploadfile.filename.rsplit(".")[-1]
-
-            # 保存到本地
-            if save_type == SaveType.LOCAL:
-                save_path = save_document_to_local(uploadfile)
-            else: # oss
-                save_path = save_document_to_oss_v1(proj_type.name, uploadfile)
-
-            document_in = DocumentCreate(
-                file_name=uploadfile.filename,  # type: ignore
-                file_suffix=file_suffix,
-                file_size=uploadfile.size,  # type: ignore
-                file_category=file_category,
-                save_type=save_type,
-                save_path=save_path,
+            document = self.process_upload_file(
+                session,
+                save_type,
+                proj_type,
+                project,
+                uinfo.id,
+                uploadfile,
+                file_category,
             )
 
-            document = Document.model_validate(
-                document_in,
-                update={
-                    "proj_id": project.id,
+            logger.info(
+                f"存在支撑文件，ocr提取附件内容, {file_category} => {uploadfile.filename}"
+            )
+
+            # 添加附件信息
+            appendix_files.append(
+                {
+                    "proj_id": str(project.id),
                     "proj_version": project.version,
+                    "proj_type": project.type,
+                    "proj_name": project.name,
+                    "doc_id": str(document.id),
                     "iscuser_id": uinfo.id,
-                },
+                    "filepath": document.save_path,
+                    "_save_type": save_type.value,
+                }
             )
-            session.add(document)
-            session.commit()
-            session.refresh(document)
-
-            # 审核三措文档
-            if file_category == FileCategory.THREESTEP:
-                # 审核docx文件
-                if file_suffix == "docx":
-                    audit_docx.delay( # type: ignore
-                        proj_id = str(project.id),  # uuid.UUID,
-                        proj_version = project.version,
-                        proj_type = project.type,
-                        proj_name = project.name,
-                        doc_id = str(document.id),  # uuid.UUID,
-                        iscuser_id = uinfo.id,
-                        filepath = save_path,
-                        _save_type = save_type.value,
-                    )
-
-                # 审核pdf扫描件
-                else:
-                    audit_scan_pdf.delay( # type: ignore
-                        proj_id = str(project.id),  # uuid.UUID,
-                        proj_version = project.version,
-                        proj_type = project.type,
-                        proj_name = project.name,
-                        doc_id = str(document.id),  # uuid.UUID,
-                        iscuser_id = uinfo.id,
-                        filepath = save_path,
-                        _save_type = save_type.value,
-                    )
 
             documents.append(DocumentPublic.model_validate(document))
+
+        # 审核三措文档
+
+        # 审核docx文件
+        assert threeone_file.filename is not None, "三措文件名不能为空"
+
+        threeone_document = self.process_upload_file(
+            session,
+            save_type,
+            proj_type,
+            project,
+            uinfo.id,
+            threeone_file,
+            FileCategory.THREESTEP,
+        )
+
+        documents.append(DocumentPublic.model_validate(threeone_document))
+
+        # 审核docx文件，直接用包提取
+        if threeone_file.filename.endswith("docx"):
+            task_func = audit_docx
+
+        # 审核pdf文件，ocr提取。
+        else:
+            task_func = audit_scan_pdf
+
+        # 审核docx和pdf的参数是一样的。
+        task_func.delay(  # type: ignore
+            proj_id=str(project.id),  # uuid.UUID,
+            proj_version=project.version,
+            proj_type=project.type,
+            proj_name=project.name,
+            doc_id=str(threeone_document.id),  # uuid.UUID,
+            iscuser_id=uinfo.id,
+            filepath=threeone_document.save_path,
+            _save_type=save_type.value,
+            appendix_files = appendix_files,
+        )
 
         return DocumentsPublic(data=documents, count=len(documents))
 
@@ -569,8 +615,8 @@ class DocumentRoute:
             #     with open(absolute_filepath, 'rb') as fr:
             #         yield from fr
 
-            filecontent = BytesIO(b'')
-            with open(absolute_filepath, 'rb') as fr:
+            filecontent = BytesIO(b"")
+            with open(absolute_filepath, "rb") as fr:
                 filecontent.write(fr.read())
 
             filecontent.seek(0)
@@ -580,11 +626,11 @@ class DocumentRoute:
             logger.info(f"从OSS存储的文件下载, object_name: {document.save_path}")
             filecontent = download_document_from_oss_v1(document.save_path)
 
-        headers : dict[str, str] = {}
+        headers: dict[str, str] = {}
         headers["Content-Disposition"] = f"attachment; filename={document.file_name}"
 
         if media_type:
-            headers["Content-Type"] = media_type # "application/octet-stream"
+            headers["Content-Type"] = media_type  # "application/octet-stream"
 
         return StreamingResponse(filecontent, media_type=media_type)
 
@@ -635,9 +681,7 @@ class DocumentContentReviewRoute:
         self.router.get("/{proj_id}/all", response_model=DocumentContentReviewsPublic)(
             self.read_proj_content_reviews
         )
-        self.router.get("/{proj_id}/download")(
-            self.download_proj_content_reviews
-        )
+        self.router.get("/{proj_id}/download")(self.download_proj_content_reviews)
 
     def read_document_content_reviews(
         self,
@@ -724,9 +768,10 @@ class DocumentContentReviewRoute:
         uinfo: UserinfoDep,
         proj_id: Annotated[uuid.UUID, Path(description="项目ID")],
         version: Annotated[int, Query(description="版本ID/第几次提交")],
-        type: Annotated[Literal['txt', 'docx'], Query(description="下载的文件格式: txt 或 docx")]
+        type: Annotated[
+            Literal["txt", "docx"], Query(description="下载的文件格式: txt 或 docx")
+        ],
     ) -> StreamingResponse:
-
         statement = select(DocumentContentReview).where(
             DocumentContentReview.proj_id == proj_id,
             DocumentContentReview.proj_version == version,
@@ -747,34 +792,40 @@ class DocumentContentReviewRoute:
         for review in dc_reviews:
             sec_reviews[review.section].append(review)
 
-        title = f'【{project.name}】的第【{version}】次提交审核结果'
+        title = f"【{project.name}】的第【{version}】次提交审核结果"
 
-        headers : dict[str, str] = {}
+        headers: dict[str, str] = {}
 
-        if type == 'txt':
-
+        if type == "txt":
             txt_content: StringIO = self.write_txt_file(title, sec_reviews)
 
-            media_type = MEDIA_TYPE_MAP['txt']
-            headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(title)}.txt"
-            headers["Content-Type"] = media_type # "application/octet-stream"
+            media_type = MEDIA_TYPE_MAP["txt"]
+            headers["Content-Disposition"] = (
+                f"attachment; filename*=UTF-8''{quote(title)}.txt"
+            )
+            headers["Content-Type"] = media_type  # "application/octet-stream"
 
-            return StreamingResponse(txt_content, headers=headers, media_type=media_type)
+            return StreamingResponse(
+                txt_content, headers=headers, media_type=media_type
+            )
 
         else:
             docx_content: BytesIO = self.write_docx_file(title, sec_reviews)
 
-            media_type = MEDIA_TYPE_MAP['docx']
-            headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(title)}.docx"
-            headers["Content-Type"] = media_type # "application/octet-stream"
+            media_type = MEDIA_TYPE_MAP["docx"]
+            headers["Content-Disposition"] = (
+                f"attachment; filename*=UTF-8''{quote(title)}.docx"
+            )
+            headers["Content-Type"] = media_type  # "application/octet-stream"
 
-            return StreamingResponse(docx_content, headers=headers, media_type=media_type)
+            return StreamingResponse(
+                docx_content, headers=headers, media_type=media_type
+            )
 
-
-
-    def write_txt_file(self, title: str, sec_reviews: dict[SectionType, list[DocumentContentReview]]) -> StringIO:
-
-        string_io = StringIO(f'{title}\n\n')
+    def write_txt_file(
+        self, title: str, sec_reviews: dict[SectionType, list[DocumentContentReview]]
+    ) -> StringIO:
+        string_io = StringIO(f"{title}\n\n")
 
         for sec_title, section in SectionTitleTypeMap.items():
             string_io.write(f"【{sec_title}】存在的问题")
@@ -786,9 +837,7 @@ class DocumentContentReviewRoute:
                 string_io.write("该节暂不支持审查，或审查失败！")
                 string_io.write("\n")
             else:
-
                 for index, review in enumerate(reviews, start=1):
-
                     string_io.write(f"问题{index}:\n")
                     string_io.write(f"{'-' * 10}\n")
                     string_io.write(f"问题: {review.question}\n")
@@ -803,19 +852,20 @@ class DocumentContentReviewRoute:
 
         return string_io
 
-    def write_docx_file(self, title: str, sec_reviews: dict[SectionType, list[DocumentContentReview]]) -> BytesIO:
-
+    def write_docx_file(
+        self, title: str, sec_reviews: dict[SectionType, list[DocumentContentReview]]
+    ) -> BytesIO:
         bytes_io = BytesIO()
 
         document = docx.Document()
 
         # 设置默认字体为中文
-        style = document.styles['Normal']
-        font = style.font # type: ignore
+        style = document.styles["Normal"]
+        font = style.font  # type: ignore
 
-        font.name = '宋体'
+        font.name = "宋体"
         font.size = Pt(12)
-        style.element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        style.element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
 
         document.add_heading(title, 0)
 
@@ -830,14 +880,22 @@ class DocumentContentReviewRoute:
                 document.add_paragraph("该节暂不支持审查，或审查失败！")
                 # document.add_paragraph("\n")
             else:
-
                 for index, review in enumerate(reviews, start=1):
-
                     document.add_heading(f"问题{index}", level=2)
-                    document.add_paragraph(f"问题: {review.question}", style='List Bullet')
-                    document.add_paragraph(f"建议: {review.feedback}", style='List Bullet')
-                    document.add_paragraph(f"依据文件: {review.reference_filename or '无'}", style='List Bullet')
-                    document.add_paragraph(f"依据内容: {review.reference_content or '无'}", style='List Bullet')
+                    document.add_paragraph(
+                        f"问题: {review.question}", style="List Bullet"
+                    )
+                    document.add_paragraph(
+                        f"建议: {review.feedback}", style="List Bullet"
+                    )
+                    document.add_paragraph(
+                        f"依据文件: {review.reference_filename or '无'}",
+                        style="List Bullet",
+                    )
+                    document.add_paragraph(
+                        f"依据内容: {review.reference_content or '无'}",
+                        style="List Bullet",
+                    )
                     # document.add_paragraph("\n")
 
             # document.add_paragraph("\n\n")
@@ -847,6 +905,7 @@ class DocumentContentReviewRoute:
         bytes_io.seek(0)
 
         return bytes_io
+
 
 document_enum_router = DocumentEnumRoute().router
 projects_router = ProjectsRoute().router

@@ -1,0 +1,88 @@
+{
+    "request_id": "36f74483-bc32-4ba8-96b3-b7a140ae0337",
+    "date": "2025-08-19T09:58:15Z",
+    "answer": "{\"output\": \"{\\\"para_node_tree\\\": [{\\\"node_id\\\": 0, \\\"text\\\": \\\"\\\", \\\"para_type\\\": \\\"root\\\", \\\"parent\\\": null, \\\"children\\\": [1, 2, 3], \\\"position\\\": [], \\\"table\\\": null}, {\\\"node_id\\\": 1, \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5NzA0Mywic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ4OTg4NDN9.KAh0jn9rtFjNNhYTpTarFJmkFANhUUDKmHmgjufD5zc&nonce=e00bc120-7683-11f0-b41d-d2fcce721307&timestamp=1754896922&ak=mjunjun0017&redirect=false&random=25d63829-af9d-4720-b0c9-fe52176690f1\\\\n\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 30, 275, 130]}], \\\"table\\\": null}, {\\\"node_id\\\": 2, \\\"text\\\": \\\"\\\\n\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 165, 5, 10]}], \\\"table\\\": null}, {\\\"node_id\\\": 3, \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&ak=mjunjun0017&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5ODQyOSwic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ5MDAyMjl9.kuSGqcuFXJPv6Cbory3209siEbDr2NfJObm0jAVRiFE&redirect=false&format=flv&nonce=1a68034e-7687-11f0-8e94-d2fcce721307&timestamp=1754898308&random=e6e82ba9-bbe9-428e-a26c-30b8802f0527\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 180, 275, 130]}], \\\"table\\\": null}], \\\"page_contents\\\": [{\\\"page_num\\\": 0, \\\"page_width\\\": 595, \\\"page_height\\\": 842, \\\"page_angle\\\": 0, \\\"page_type\\\": \\\"text\\\", \\\"page_layouts\\\": [{\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5NzA0Mywic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ4OTg4NDN9.KAh0jn9rtFjNNhYTpTarFJmkFANhUUDKmHmgjufD5zc&nonce=e00bc120-7683-11f0-b41d-d2fcce721307&timestamp=1754896922&ak=mjunjun0017&redirect=false&random=25d63829-af9d-4720-b0c9-fe52176690f1\\\\n\\\", \\\"box\\\": [20, 30, 275, 130], \\\"node_id\\\": 1}, {\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"\\\\n\\\", \\\"box\\\": [20, 165, 5, 10], \\\"node_id\\\": 2}, {\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&ak=mjunjun0017&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5ODQyOSwic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ5MDAyMjl9.kuSGqcuFXJPv6Cbory3209siEbDr2NfJObm0jAVRiFE&redirect=false&format=flv&nonce=1a68034e-7687-11f0-8e94-d2fcce721307&timestamp=1754898308&random=e6e82ba9-bbe9-428e-a26c-30b8802f0527\\\", \\\"box\\\": [20, 180, 275, 130], \\\"node_id\\\": 3}], \\\"titles\\\": [], \\\"tables\\\": []}], \\\"pdf_data\\\": \\\"\\\", \\\"raw\\\": {}}\"}",
+    "conversation_id": "724c9124-38f8-4789-947c-5412e59dfb95",
+    "message_id": "673ad6e2-29d8-4187-a7fe-91f9e95b25fb",
+    "is_completion": null,
+    "content": [
+        {
+            "result_type": "chatflow",
+            "event_code": 0,
+            "event_message": "",
+            "event_type": "chatflow",
+            "event_id": "1",
+            "event_status": "running",
+            "content_type": "chatflow",
+            "visible_scope": "all",
+            "outputs": {
+                "name_cn": "工作流Agent"
+            },
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "type": "chatflow"
+            }
+        },
+        {
+            "result_type": "chatflow",
+            "event_code": 0,
+            "event_message": "",
+            "event_type": "chatflow",
+            "event_id": "2",
+            "event_status": "preparing",
+            "content_type": "status",
+            "visible_scope": "all",
+            "outputs": {
+                "name_cn": "工作流Agent"
+            },
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "type": "chatflow"
+            }
+        },
+        {
+            "result_type": "chatflow",
+            "event_code": 0,
+            "event_message": "",
+            "event_type": "chatflow",
+            "event_id": "3",
+            "event_status": "done",
+            "content_type": "code",
+            "visible_scope": "all",
+            "outputs": {
+                "name_cn": "工作流Agent",
+                "code": "{\"output\": \"{\\\"para_node_tree\\\": [{\\\"node_id\\\": 0, \\\"text\\\": \\\"\\\", \\\"para_type\\\": \\\"root\\\", \\\"parent\\\": null, \\\"children\\\": [1, 2, 3], \\\"position\\\": [], \\\"table\\\": null}, {\\\"node_id\\\": 1, \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5NzA0Mywic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ4OTg4NDN9.KAh0jn9rtFjNNhYTpTarFJmkFANhUUDKmHmgjufD5zc&nonce=e00bc120-7683-11f0-b41d-d2fcce721307&timestamp=1754896922&ak=mjunjun0017&redirect=false&random=25d63829-af9d-4720-b0c9-fe52176690f1\\\\n\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 30, 275, 130]}], \\\"table\\\": null}, {\\\"node_id\\\": 2, \\\"text\\\": \\\"\\\\n\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 165, 5, 10]}], \\\"table\\\": null}, {\\\"node_id\\\": 3, \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&ak=mjunjun0017&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5ODQyOSwic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ5MDAyMjl9.kuSGqcuFXJPv6Cbory3209siEbDr2NfJObm0jAVRiFE&redirect=false&format=flv&nonce=1a68034e-7687-11f0-8e94-d2fcce721307&timestamp=1754898308&random=e6e82ba9-bbe9-428e-a26c-30b8802f0527\\\", \\\"para_type\\\": \\\"text\\\", \\\"parent\\\": 0, \\\"children\\\": [], \\\"position\\\": [{\\\"page_num\\\": 0, \\\"box\\\": [20, 180, 275, 130]}], \\\"table\\\": null}], \\\"page_contents\\\": [{\\\"page_num\\\": 0, \\\"page_width\\\": 595, \\\"page_height\\\": 842, \\\"page_angle\\\": 0, \\\"page_type\\\": \\\"text\\\", \\\"page_layouts\\\": [{\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5NzA0Mywic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ4OTg4NDN9.KAh0jn9rtFjNNhYTpTarFJmkFANhUUDKmHmgjufD5zc&nonce=e00bc120-7683-11f0-b41d-d2fcce721307&timestamp=1754896922&ak=mjunjun0017&redirect=false&random=25d63829-af9d-4720-b0c9-fe52176690f1\\\\n\\\", \\\"box\\\": [20, 30, 275, 130], \\\"node_id\\\": 1}, {\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"\\\\n\\\", \\\"box\\\": [20, 165, 5, 10], \\\"node_id\\\": 2}, {\\\"type\\\": \\\"text\\\", \\\"text\\\": \\\"http://25.78.131.86:21102/mediatranscode/api/v1/play?code=280110000003010009&sessionId=111&ak=mjunjun0017&token=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIxYWRiOTc4MThiYzQ0YjlhYjIxOWFhOTAyNmRkYjY3YiIsImlhdCI6MTc1NDg5ODQyOSwic3ViIjoibWp1bmp1bjAwMTciLCJhdWQiOiLpqazlhpvlhpsiLCJleHAiOjE3NTQ5MDAyMjl9.kuSGqcuFXJPv6Cbory3209siEbDr2NfJObm0jAVRiFE&redirect=false&format=flv&nonce=1a68034e-7687-11f0-8e94-d2fcce721307&timestamp=1754898308&random=e6e82ba9-bbe9-428e-a26c-30b8802f0527\\\", \\\"box\\\": [20, 180, 275, 130], \\\"node_id\\\": 3}], \\\"titles\\\": [], \\\"tables\\\": []}], \\\"pdf_data\\\": \\\"\\\", \\\"raw\\\": {}}\"}",
+                "language": "json"
+            },
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "type": "chatflow"
+            }
+        },
+        {
+            "result_type": "chatflow",
+            "event_code": 0,
+            "event_message": "",
+            "event_type": "chatflow",
+            "event_id": "4",
+            "event_status": "success",
+            "content_type": "status",
+            "visible_scope": "all",
+            "outputs": {
+                "name_cn": "工作流Agent"
+            },
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "type": "chatflow"
+            }
+        }
+    ]
+}

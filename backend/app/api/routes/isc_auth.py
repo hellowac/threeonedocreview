@@ -107,6 +107,7 @@ class IscJavaAuth:
 
         # 3. 将用户信息缓存到redis中，用于操作时获取用户信息并存储相关操作的用户ID。
         expires_in = token_resp.expires_in - 2
+        logger.info(f"用户信息过期秒数: {expires_in}")
         cache_userinfo(redis, uinfo, token_resp.access_token, expires_in)
 
         # 4. 将用户信息保存到数据库中，如果没有。

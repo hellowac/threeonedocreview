@@ -16,6 +16,7 @@ from pydantic import (
 )
 from pydantic_core import MultiHostUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from app.core.enums import OcrApiType
 
 # 与app同级的目录
 PROJECT_PATH = Path(__file__).parent.parent
@@ -89,10 +90,34 @@ class Settings(BaseSettings):
     ISC_AUTH_USERINFO_PATH: str = '/acloud-isc-token/users/info'
 
     # ocr 调用接口的定义
-    OCR_PROTOCOL: str = 'http'
-    OCR_HOST: str = '183.221.0.158'
-    OCR_PORT: int = 29966
-    OCR_PATH: str = '/api/ocr/text_rec'
+    # PPOCR_PROTOCOL: str = 'http'
+    # PPOCR_HOST: str = '183.221.0.158'
+    # PPOCR_PORT: int = 29966
+    # PPOCR_PATH: str = '/api/ocr/text_rec'
+
+    PPOCR_PROTOCOL: str = 'http'
+    PPOCR_HOST: str = 'ppocr'
+    PPOCR_PORT: int = 9966
+    PPOCR_PATH: str = '/api/ocr/text_rec'
+
+    # baidu ocr 配置
+    BAIDUOCR_PROTOCOL: str = 'http'
+    BAIDUOCR_HOST: str = '25.78.180.90'
+    BAIDUOCR_PORT: int = 31001
+    BAIDUOCR_AUTH: str = 'private-x|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYjU1MTJiMy1mYzljLTQyMzYtYjBjZi1jZTQ4MWE3OTg5NTAiLCJzdWIiOiJlMzA5ZWU5MmI0N2Y0ZDY5ODI5M2EyMjVhMDg5MWExMCIsImFpYmFzZV9wcm9qZWN0X2lkIjoicHJvai0wMDUyd3kwMThkNDNpNzV0In0.KKkgE1P_BTZp9Y86qEM2UXzA37zNdoUPl6JGamLoDI8'
+
+    # 参数
+    BAIDUOCR_DEPARTMENDD_ID: str = 'proj-0052wy018d43i75t' # 项目ID
+    BAIDUOCR_APP_ID: str = '4d664263-2d10-4d8a-9bf1-f3c3b94d0706'  # 应用ID
+
+    # 'Bearer private-x|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYjU1MTJiMy1mYzljLTQyMzYtYjBjZi1jZTQ4MWE3OTg5NTAiLCJzdWIiOiJlMzA5ZWU5MmI0N2Y0ZDY5ODI5M2EyMjVhMDg5MWExMCIsImFpYmFzZV9wcm9qZWN0X2lkIjoicHJvai0wMDUyd3kwMThkNDNpNzV0In0.KKkgE1P_BTZp9Y86qEM2UXzA37zNdoUPl6JGamLoDI8'
+
+    BAIDUOCR_CONVERSATION_PATH: str = '/api/ai_apaas/v1/app/conversation'
+    BAIDUOCR_UPLOAD_PATH: str = '/api/ai_apaas/v1/app/conversation/file/upload'
+    BAIDUOCR_RUN_PATH: str = '/api/ai_apaas/v1/app/conversation/runs'
+
+    # OCR 使用的API类型
+    OCR_API_TYPE: OcrApiType = OcrApiType.PPOCR
 
     # 超级用户的用户名
     SUPERUSER_USERNAME: str = "lbhai5217"
@@ -113,10 +138,39 @@ class Settings(BaseSettings):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def ocr_text_url(self) -> str:
+    def ppocr_text_url(self) -> str:
         """ ocr 识别文本，调用URL """
 
-        return f"{self.OCR_PROTOCOL}://{self.OCR_HOST}:{self.OCR_PORT}{self.OCR_PATH}"
+        uri = f"{self.PPOCR_PROTOCOL}://{self.PPOCR_HOST}:{self.PPOCR_PORT}{self.PPOCR_PATH}"
+
+        return uri
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def baiduocr_conversation_url(self) -> str:
+        """ ocr 识别文本，baidu接口获取conversation_id """
+
+        uri = f"{self.BAIDUOCR_PROTOCOL}://{self.BAIDUOCR_HOST}:{self.BAIDUOCR_PORT}{self.BAIDUOCR_CONVERSATION_PATH}"
+
+        return uri
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def baiduocr_upload_url(self) -> str:
+        """ ocr 识别文本，上传文件的接口 """
+
+        uri = f"{self.BAIDUOCR_PROTOCOL}://{self.BAIDUOCR_HOST}:{self.BAIDUOCR_PORT}{self.BAIDUOCR_UPLOAD_PATH}"
+
+        return uri
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def baiduocr_run_url(self) -> str:
+        """ ocr 识别文本，上传文件的接口 """
+
+        uri = f"{self.BAIDUOCR_PROTOCOL}://{self.BAIDUOCR_HOST}:{self.BAIDUOCR_PORT}{self.BAIDUOCR_RUN_PATH}"
+
+        return uri
 
     def build_agent_create_session_api(self, protocol: str, host: str, port: int) -> str:
         """ 智能体创建session的链接地址 """
@@ -228,3 +282,9 @@ class Settings(BaseSettings):
 settings = Settings()  # type: ignore
 
 os.makedirs(settings.UPLOAD_FILES_DIR, exist_ok=True)
+
+logger.info(f"ocr 接口使用类型: {settings.OCR_API_TYPE = }")
+logger.info(f"ppocr 接口地址: {settings.ppocr_text_url = }")
+logger.info(f"baiduocr 创建会话地址: {settings.baiduocr_conversation_url = }")
+logger.info(f"baiduocr 上传文件地址: {settings.baiduocr_upload_url = }")
+logger.info(f"baiduocr 运行智能体地址: {settings.baiduocr_run_url = }")

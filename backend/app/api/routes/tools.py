@@ -1,13 +1,18 @@
+import traceback
 import uuid
+from datetime import datetime
 from typing import Annotated, Any
 
 import html2text
-from fastapi import APIRouter, File, HTTPException, Path, Query, UploadFile
+import pytz
+from fastapi import APIRouter, File, Form, HTTPException, Path, Query, UploadFile
 from loguru import logger
 from sqlmodel import col, desc, func, select
 
 from app.api.deps import SaveTypeDep, SessionDep, UserinfoDep
-from app.api.utils import save_document_to_local, save_document_to_oss_v2
+from app.api.utils import save_document_to_local, save_document_to_oss_v1
+from app.core.config import settings
+from app.core.enums import OcrApiType
 from app.models.enums import SaveType
 
 # 文档及内容的模型
@@ -18,24 +23,20 @@ from app.models.parsedfile import (
     ParsedFilesPublic,
 )
 from app.mydocx.entry import Extract, RenderFormat
+from app.tasks.audit import ocr_pdf2png2text
 
 
 class ToolRoute:
     router = APIRouter(prefix="/tool", tags=["tool"])
 
     def __init__(self) -> None:
-        self.router.get("/parse/files", response_model=ParsedFilesPublic)(
-            self.get_parsed_files
-        )
-        self.router.post("/parse/files", response_model=ParsedFilePublic)(
-            self.post_parsed_files
-        )
-        self.router.get("/parse/files/search", response_model=ParsedFilesPublic)(
-            self.search_parsed_files
-        )
-        self.router.get(
-            "/parse/files/{file_id}", response_model=ParsedFilePublicContent
-        )(self.get_parsed_file_content)
+        self.router.get("/parse/files")(self.get_parsed_files)
+        self.router.post("/parse/files")(self.post_parsed_files)
+        self.router.get("/parse/files/search")(self.search_parsed_files)
+        self.router.get("/parse/files/{file_id}")(self.get_parsed_file_content)
+
+        # ocr调试
+        self.router.post("/ocr/debug")(self.post_ocr_debug)
 
     def get_parsed_files(
         self, session: SessionDep, uinfo: UserinfoDep
@@ -86,7 +87,7 @@ class ToolRoute:
         if save_type == SaveType.LOCAL:
             save_path = save_document_to_local(docx_file)
         else:
-            save_path = save_document_to_oss_v2("parsedfile", docx_file)
+            save_path = save_document_to_oss_v1("parsedfile", docx_file)
 
         parsedfile = ParsedFile(
             iscuser_id=uinfo.id,
@@ -133,7 +134,8 @@ class ToolRoute:
             select(func.count())
             .select_from(ParsedFile)
             .where(
-                ParsedFile.is_delete == False, col(ParsedFile.file_name).contains(key)  # noqa: E712
+                ParsedFile.is_delete == False,  # noqa: E712
+                col(ParsedFile.file_name).contains(key),
             )
         )
 
@@ -142,10 +144,9 @@ class ToolRoute:
 
         count = session.exec(count_statement).one()
 
-        statement = (
-            select(ParsedFile).where(
-                ParsedFile.is_delete == False, col(ParsedFile.file_name).contains(key)  # noqa: E712
-            )
+        statement = select(ParsedFile).where(
+            ParsedFile.is_delete == False,  # noqa: E712
+            col(ParsedFile.file_name).contains(key),
         )
         if not uinfo.is_superuser:
             statement = statement.where(ParsedFile.iscuser_id == uinfo.id)
@@ -171,6 +172,76 @@ class ToolRoute:
             raise HTTPException(404, "文件不存在")
 
         return ParsedFilePublicContent.model_validate(parsedfile)
+
+    def post_ocr_debug(
+        self,
+        session: SessionDep,
+        api_type: Annotated[OcrApiType, Form(description="ocr调用的接口类型")],
+        doc_file: Annotated[UploadFile, File(description="ocr要识别处理的文件")],
+    ) -> dict:
+        """在线调试ocr识别功能"""
+
+        logger.info(f"ocr调试要使用的类型: {api_type.value}")
+        logger.info(f"ocr调试要识别的文件: {doc_file}")
+
+        status_code = 200
+        resp_text: str = ""  # "这是原始结果"
+        resp_res_text: str = ""  # "这是解析后的结果"
+        error_traceback: str | None = None  # "这是来自服务器的错误结果"
+        process_msg: str = ""  # "这是处理过程消息"
+
+        req_begin_at = datetime.now(tz=pytz.timezone("Asia/Shanghai"))
+
+        try:
+            resp_text, process_msg = ocr_pdf2png2text(
+                doc_file.file, proj_name="ocrdebug", proj_version=1, api_type=api_type
+            )
+            resp_res_text = resp_text
+
+            # resp_text = "这是原始结果"
+            # resp_res_text = "这是解析后的结果"
+            # error_traceback = None # "这是来自服务器的错误结果"
+            # process_msg = "这是处理过程消息"
+
+        except Exception as e:
+            logger.exception(e)
+            error_traceback = traceback.format_exc()
+
+        configinfo: dict[str, str] = {}
+
+        if api_type == OcrApiType.BAIDU:
+            # 获取会话路径
+            configinfo["session_path"] = settings.baiduocr_conversation_url
+            # 上传文件路径
+            configinfo["upload_path"] = settings.baiduocr_upload_url
+            # 运行agent路径（执行ocr识别）
+            configinfo["agent_path"] = settings.baiduocr_run_url
+            # 应用id
+            configinfo["app_id"] = settings.BAIDUOCR_APP_ID
+            # 项目id
+            configinfo["department_id"] = settings.BAIDUOCR_DEPARTMENDD_ID
+
+        else:
+            configinfo["session_path"] = settings.ppocr_text_url
+            configinfo["upload_path"] = settings.ppocr_text_url
+            configinfo["agent_path"] = settings.ppocr_text_url
+            configinfo["app_id"] = ""
+            configinfo["department_id"] = ""
+
+        resp_done_at = datetime.now(tz=pytz.timezone("Asia/Shanghai"))
+        resp_spend = round((resp_done_at - req_begin_at).total_seconds(), 2)
+
+        return {
+            "configinfo": configinfo,
+            "status_code": status_code,
+            "req_begin_at": req_begin_at.strftime('%Y-%m-%d %H:%M:%S'),
+            "resp_done_at": resp_done_at.strftime('%Y-%m-%d %H:%M:%S'),
+            "resp_spend": resp_spend,
+            "resp_text": resp_text,
+            "resp_res_text": resp_res_text,
+            "error_traceback": error_traceback,
+            "process_msg": process_msg,
+        }
 
 
 tools_router = ToolRoute().router

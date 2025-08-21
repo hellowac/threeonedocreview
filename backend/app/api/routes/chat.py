@@ -211,7 +211,7 @@ def ask_agent(session: Session, question: str) -> str:
 
     statement = (
         select(AgentSetting)
-        .where(AgentSetting.section == ForSection.assistant_qa)
+        .where(AgentSetting.section == ForSection.assistant)
         .limit(1)
     )
     setting = session.exec(statement).first()
@@ -221,7 +221,7 @@ def ask_agent(session: Session, question: str) -> str:
 
     ai_anwser: str = ''
 
-    ai_anwser, err_msg = get_agent_resp_text(post_agent_api(setting, question))
+    ai_anwser, err_msg = get_agent_resp_text(post_agent_api(setting, question, is_chat=True))
     logger.info(f"ai回答: {ai_anwser}")
 
     if err_msg:

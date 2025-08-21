@@ -2,7 +2,7 @@ import json
 import traceback
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 
 import pytz
 from fastapi import APIRouter, Body, HTTPException, Path, Query
@@ -38,16 +38,12 @@ class AgentSettingRoute:
     router = APIRouter(prefix="/agentsettings", tags=["sys settings"])
 
     def __init__(self) -> None:
-        self.router.get("", response_model=AgentSettingsPublic)(self.get_agent_settings)
-        self.router.get("/{proj_type}", response_model=AgentSettingsPublic)(self.get_agent_settings_by_type)
-        self.router.post("/{setting_id}/update", response_model=AgentSettingPublic)(
-            self.update_agent_setting
-        )
+        self.router.get("")(self.get_agent_settings)
+        self.router.get("/{proj_type}")(self.get_agent_settings_by_type)
+        self.router.post("/{setting_id}/update")(self.update_agent_setting)
         self.router.post("/{setting_id}/debug")(self.debug_agent_setting)
         self.router.get("/debug/records")(self.get_debug_records)
-        self.router.post("/debug/record/{record_id}/delete")(
-            self.delete_debug_record
-        )
+        self.router.post("/debug/record/{record_id}/delete")(self.delete_debug_record)
 
     def get_agent_settings(self, session: SessionDep) -> AgentSettingsPublic:
         """获取所有的agent系统配置"""
@@ -62,12 +58,20 @@ class AgentSettingRoute:
 
         return AgentSettingsPublic(data=pubs, count=count)
 
-    def get_agent_settings_by_type(self, session: SessionDep, proj_type: Annotated[AgentType, Path()]) -> AgentSettingsPublic:
+    def get_agent_settings_by_type(
+        self, session: SessionDep, proj_type: Annotated[AgentType, Path()]
+    ) -> AgentSettingsPublic:
         """获取所有的agent系统配置"""
 
-        count = session.exec(select(func.count()).where(AgentSetting.agent_type == proj_type)).one()
+        count = session.exec(
+            select(func.count()).where(AgentSetting.agent_type == proj_type)
+        ).one()
 
-        statement = select(AgentSetting).where(AgentSetting.agent_type == proj_type).order_by(asc(AgentSetting.section))
+        statement = (
+            select(AgentSetting)
+            .where(AgentSetting.agent_type == proj_type)
+            .order_by(asc(AgentSetting.section))
+        )
 
         settings = session.exec(statement).all()
 
@@ -146,7 +150,7 @@ class AgentSettingRoute:
             port=setting.port,
             app_key=setting.app_key,
             agent_code=setting.agent_code,
-            agent_version=setting.agent_code,
+            agent_version=setting.agent_version,
             agent_type=setting.agent_type,
             section=setting.section,
             req_begin_at=datetime.now(tz=pytz.timezone("Asia/Shanghai")),
@@ -154,7 +158,10 @@ class AgentSettingRoute:
 
         try:
             url, headers, req_payload, session_id, resp = post_agent_api_core(
-                setting, payload.content, timeout=payload.timeout
+                setting,
+                payload.content,
+                attachment=payload.attchement_content or "",  # 附件内容
+                timeout=payload.timeout,
             )
 
             record.session_id = session_id
@@ -253,7 +260,7 @@ class AgentSettingRoute:
     def delete_debug_record(
         self, session: SessionDep, record_id: Annotated[int, Path()]
     ) -> bool:
-        """ 删除一条调试记录 """
+        """删除一条调试记录"""
 
         record = session.get(AgentSettingDebugRecord, record_id)
 

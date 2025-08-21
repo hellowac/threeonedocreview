@@ -2,6 +2,7 @@ from collections.abc import Generator
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from loguru import logger
 from redis import StrictRedis
 from sqlmodel import Session
 
@@ -51,6 +52,7 @@ def get_userinfo(redis: RedisDep, token: IscTokenDep) -> UserinfoResp | None:
     userinfo_str: str | None = redis.get(key)  # type: ignore
 
     if not userinfo_str:
+        logger.info(f"【{key}】用户信息已过期, 需要重新登录")
         raise HTTPException(401, "需要重新登陆")
 
     uinfo = UserinfoResp.model_validate_json(userinfo_str)

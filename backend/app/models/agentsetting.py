@@ -61,6 +61,7 @@ class AgentSettingDebug(SQLModel):
     """agentsetting 调试内容"""
 
     content: str
+    attchement_content: str | None = None
     timeout: float | None = None
 
 
