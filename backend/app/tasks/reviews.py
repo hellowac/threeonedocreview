@@ -29,6 +29,7 @@ from app.models.enums import (
     AgentType,
     FileCategory,
     ForSection,
+    ForSectionTitleMap,
     ProjectTypeEnum,
     ReviewStatus,
     SectionContextRelated,
@@ -428,14 +429,16 @@ def request_remote_agent(
     # 该智能体未启用时，直接退出
     if not agent_setting.is_enable:
         err_msgs.append(
-            f"【{dcontent.project.type.name}】-【{dcontent.section.name}】的智能体尚未支持审查"
+            f"【{dcontent.project.type.name}】-【{dcontent.section.name}】的智能体尚未支持审查或未启用！"
         )
 
         return dcontent, ";".join(err_msgs)
 
     # 该message应为agent返回的文本, 从该文本中extract 问题/建议详细
     # agent_resp = post_agent_api(agent_setting, dcontent.suggestion)
-    agent_resp = post_agent_api(agent_setting, contexted_message_json_str, attachment=attachment)
+    agent_resp = post_agent_api(
+        agent_setting, contexted_message_json_str, attachment=attachment
+    )
 
     # 预期为json格式的数据: [{question: xxx, question_tag: xxx, ...}, ...]
     # {
@@ -457,16 +460,26 @@ def request_remote_agent(
     # 实际格式如:
     # [
     #     {
-    #         "catalog_name": "施工作业特点",
-    #         "question": "作业特点未突出特殊性：现有内容为通用性描述，未结合本工程具体特点（如双回线路同步拆除风险）。",
-    #         "question_tag": "描述不具体",
-    #         "question_exist": "true",
-    #         "feedback": "增加针对性说明，例如“同塔双回线路拆除需同步协调停电，避免误碰带电线路”或“需采用分段牵引法防止导线坠落”。",
-    #         "feedback_exist": "true",
-    #         "feedback_tag": "增加说明",
-    #         "filename": "无支撑材料。",
-    #         "content": "无支撑材料。",
-    #         "ai_error": ""
+    #         "risk_type": "有错别字",  # 问题类型，简述
+    #         "project_status": "所有安全工器具的编号字段为空",# 方案现状（原文，省略的），简述
+    #         "project_source_location": "施工安全保证措施-(一)-安全工器具配置",# 原文出处（末级标题，不要原文）
+    #         "evidence_quote": "安全工器具应进行编号管理，确保每件工器具的唯一性。",  # 标准要求，引用文件内容，（省略的）
+    #         "source_document_name": "《国家电网公司电力安全工器具管理规定》", # 出处文件，文件名字
+    #         "source_section_number": "第四章 日常管理",     # 来源标题
+    #         "modification_suggestion": "为所有安全工器具补充唯一编号，并记录在清单中。",  # 修改意见
+    #         "risk_type_class": "技术参数缺失",  # 问题标签，对risk_type进行抽象提取总结，可视化用，用来展示三措编制人员存在哪些问题
+    #         "evidence_quote_class": "安全管理制度"  # 引用标准标签，对evidence_quote进行抽象提取总结，可视化用，用来展示三措哪些规章制度编写人员不熟悉
+    #     },
+    #     {
+    #         "risk_type": "审查内容中存在错别字",
+    #         "project_status": "项木安全员：裴有梁 13897064503",
+    #         "project_source_location": "末级标题",
+    #         "evidence_quote": "None",
+    #         "source_document_name": "None",
+    #         "source_section_number": "None",
+    #         "modification_suggestion": "应将 \"项木安全员\" 修改为 \"项目安全员\"，确保职责名称书写正确",
+    #         "risk_type_class": "内容包含错别字",
+    #         "evidence_quote_class": "None"
     #     },
     #     ....
     # ]
@@ -489,12 +502,15 @@ def request_remote_agent(
             doc_id=dcontent.doc_id,
             content_id=dcontent.id,
             section=dcontent.section,
-            question=feedback.get("question"),
-            question_tag=feedback.get("question_tag"),
-            feedback=feedback.get("feedback"),
-            feedback_tag=feedback.get("feedback_tag"),
-            reference_filename=feedback.get("filename"),
-            reference_content=feedback.get("content"),
+            question=feedback.get("risk_type"),  # 问题详细
+            question_tag=feedback.get("risk_type_class"),  # 问题标签
+            feedback=feedback.get("modification_suggestion"), # 建议反馈详细内容
+            feedback_tag=feedback.get("evidence_quote_class"), # 建议反馈标签
+            reference_filename=feedback.get("source_document_name"),  # 引用文件名
+            reference_content=feedback.get("evidence_quote"), # 引用文件内容
+            reference_location=feedback.get("source_section_number"),  # 引用文件中内容的位置
+            source_text=feedback.get('project_status'), # 原文内容，简述
+            source_location=feedback.get('project_source_location'),  # 原文内容位置
             ai_error=feedback.get("ai_error"),
         )
 
@@ -525,11 +541,11 @@ def get_attachment_from_db(session: Session, proj: Project) -> str:
         return ""
 
     statement1 = select(DocumentContent.content).where(
-        DocumentContent.id.in_(attchement_docs_id) # type: ignore
+        DocumentContent.id.in_(attchement_docs_id)  # type: ignore
     )
     dcs = list(session.exec(statement1).all())
 
-    return '\n'.join(dcs)
+    return "\n".join(dcs)
 
 
 # 文档/项目的概述：调用AI将多个suggestion提炼成1个suggestion
@@ -649,11 +665,17 @@ def post_agent_api_core(
     if is_chat:
         message = RunAgentMessagePayload(text=_message)
 
-    # agent 会用用json.loads 来加载数据。
+    # agent 会用json.loads 来加载数据。
     else:
         message = RunAgentMessagePayload(
             text=json.dumps(
-                {"examine_content": _message, "attachment": attachment},
+                {
+                    "section": ForSectionTitleMap[agent_setting.section],   # 对应的节
+                    "examine_content": _message,                    # 审核的内容
+                    "attachment": attachment,                       # 附件信息
+                    "risk_type_class": agent_setting.risk_types or "",  # 设置的风险类型
+                    "evidence_quote_class": agent_setting.ref_docs or "",  # 设置的引用文件
+                },
                 ensure_ascii=False,
             )
         )

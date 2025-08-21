@@ -842,8 +842,18 @@ class DocumentContentReviewRoute:
                     string_io.write(f"{'-' * 10}\n")
                     string_io.write(f"问题: {review.question}\n")
                     string_io.write(f"建议: {review.feedback}\n")
-                    string_io.write(f"依据文件: {review.reference_filename or '无'}\n")
-                    string_io.write(f"依据内容: {review.reference_content or '无'}\n")
+
+                    if review.source_text and review.source_location:
+                        string_io.write("\n")
+                        string_io.write(f"原文: {review.source_text}\n")
+                        string_io.write(f"位置: {review.source_location}\n")
+
+                    if review.reference_filename and review.reference_content:
+                        string_io.write("\n")
+                        string_io.write(f"依据文件: {review.reference_filename }\n")
+                        if review.reference_location:
+                            string_io.write(f"依据位置: {review.reference_location }\n")
+                        string_io.write(f"依据内容: {review.reference_content }\n")
                     string_io.write("\n")
 
             string_io.write("\n\n")
@@ -888,14 +898,31 @@ class DocumentContentReviewRoute:
                     document.add_paragraph(
                         f"建议: {review.feedback}", style="List Bullet"
                     )
-                    document.add_paragraph(
-                        f"依据文件: {review.reference_filename or '无'}",
-                        style="List Bullet",
-                    )
-                    document.add_paragraph(
-                        f"依据内容: {review.reference_content or '无'}",
-                        style="List Bullet",
-                    )
+
+                    if review.source_text and review.source_location:
+                        document.add_paragraph(
+                            f"原文: {review.source_text}",
+                            style="List Bullet",
+                        )
+                        document.add_paragraph(
+                            f"位置: {review.source_location}",
+                            style="List Bullet",
+                        )
+
+                    if review.reference_filename and review.reference_content:
+                        document.add_paragraph(
+                            f"依据文件: {review.reference_filename}",
+                            style="List Bullet",
+                        )
+                        if review.reference_location:
+                            document.add_paragraph(
+                                f"依据位置: {review.reference_location}",
+                                style="List Bullet",
+                            )
+                        document.add_paragraph(
+                            f"依据内容: {review.reference_content}",
+                            style="List Bullet",
+                        )
                     # document.add_paragraph("\n")
 
             # document.add_paragraph("\n\n")

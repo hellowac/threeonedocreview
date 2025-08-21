@@ -139,3 +139,22 @@ class ForSection(StrEnum):
     # --- 不属于 文档审查 ------
     assistant = '智能助手'
 
+
+ForSectionTitleMap: dict[ForSection, str] = {
+    ForSection.one: "工程概况及施工作业特点",
+    ForSection.two: "施工作业计划工期、开(峻)工时间",
+    ForSection.three: "停电范围",
+    ForSection.four: "作业主要内容",
+    ForSection.five: "组织措施",
+    ForSection.six: "技术措施",
+
+    # 安全措施
+    ForSection.sevenone: "安全措施 - 安全工器具配置",
+    ForSection.seventwo: "安全措施 - 施工工器具配置",
+    ForSection.seventhree: "安全措施 - 风险点（危险点）分析及控制措施",
+    ForSection.sevenfour: "安全措施 - 具体安全措施",
+
+    ForSection.eight: "应急处置措施",
+    ForSection.nine: "施工作业工艺标准及验收",
+    ForSection.ten: "现场作业示意图",
+}

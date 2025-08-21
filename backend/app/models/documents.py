@@ -428,6 +428,10 @@ class DocumentContentReview(TableBase, DocumentContentReviewBase, table=True):
 
     reference_filename: str | None = Field(default=None, max_length=255, description="参考文件")
     reference_content: str | None = Field(default=None, description="参考内容", sa_type=MEDIUMTEXT)
+    reference_location: str | None = Field(default=None, description="引用文件中内容的位置", sa_type=MEDIUMTEXT)
+
+    source_text: str | None = Field(default=None, description="原文内容，简述", sa_type=MEDIUMTEXT)
+    source_location: str | None = Field(default=None, description="原文内容位置", sa_type=MEDIUMTEXT)
 
     ai_error: str | None = Field(
         None, description="审查过程中出现的错误", sa_type=MEDIUMTEXT
@@ -449,6 +453,9 @@ class DocumentContentReviewPublic(SQLModel):
     feedback_tag: str | None
     reference_filename: str | None
     reference_content: str | None
+    reference_location: str | None
+    source_text: str | None
+    source_location: str | None
     ai_error: str | None
 
     create_at: datetime

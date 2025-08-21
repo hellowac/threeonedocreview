@@ -99,6 +99,8 @@ class AgentSettingRoute:
         setting.agent_code = payload.agent_code
         setting.agent_version = payload.agent_version
         setting.is_enable = payload.is_enable
+        setting.risk_types = payload.risk_types
+        setting.ref_docs = payload.ref_docs
 
         # 更新为新的session_id
         try:

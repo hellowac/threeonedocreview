@@ -23,7 +23,12 @@ class AgentSettingBase(SQLModel):
         min_length=1, max_length=255, description="智能体版本编码"
     )
     is_enable: bool = Field(default=True, description = "是否启用，即审查的智能体是否可用")
-
+    risk_types: str | None = Field(
+        default=None, max_length=255, description="审核风险分类", sa_type=MEDIUMTEXT
+    )
+    ref_docs: str | None = Field(
+        default=None, max_length=255, description="引用文件分类", sa_type=MEDIUMTEXT
+    )
 
 class AgentSetting(TableBase, AgentSettingBase, table=True):
     id: uuid.UUID = Field(
