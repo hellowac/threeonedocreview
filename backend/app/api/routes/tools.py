@@ -193,7 +193,9 @@ class ToolRoute:
         req_begin_at = datetime.now(tz=pytz.timezone("Asia/Shanghai"))
 
         try:
-            resp_text, process_msg = ocr_pdf2png2text(
+            assert doc_file.filename is not None, "文件名不能为空！"
+
+            resp_text, process_msg = ocr_pdf2png2text(doc_file.filename,
                 doc_file.file, proj_name="ocrdebug", proj_version=1, api_type=api_type
             )
             resp_res_text = resp_text

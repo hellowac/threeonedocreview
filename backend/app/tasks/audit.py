@@ -123,6 +123,10 @@ def baiduocr_post_png(
     # 2.1 构造上传文件的参数
 
     # 其他字段，不要与文件放在files中。。
+    upload_headers = {
+        "Authorization": f"Bearer {settings.BAIDUOCR_AUTH}",
+        "X-Authorization": f"Bearer {settings.BAIDUOCR_AUTH}"
+    }
     upload_payload = {
         "app_id": settings.BAIDUOCR_APP_ID,
         "department_id": settings.BAIDUOCR_DEPARTMENDD_ID,
@@ -139,7 +143,7 @@ def baiduocr_post_png(
         settings.baiduocr_upload_url,
         data=upload_payload,
         files=upload_files,
-        headers=headers,
+        headers=upload_headers,  # 这里不要有content-type字段的值。
     )
 
     # 示例响应结构
