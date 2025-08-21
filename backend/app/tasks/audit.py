@@ -305,7 +305,7 @@ def ocr_pdf2png2text(
             file_bytes = filepath.read()
 
         _suffix = Path(filename).suffix[1:]
-        file_media_type = MEDIA_TYPE_MAP.get(_suffix)
+        file_media_type = MEDIA_TYPE_MAP.get(_suffix.lower())  # 转为小写后再获取
 
         assert file_media_type is not None, f"【{filename}】的媒体类型获取失败"
 
@@ -364,8 +364,10 @@ def audit_scan_pdf(
     # 处理三措文档
     with Session(bind=engine) as session:
         filename = Path(filepath).name
+
+        # 审核的是偶，api类型使用系统设置的。
         pdf_text, _process_msg = ocr_pdf2png2text(
-            filename, absolute_filepath, proj_name, proj_version
+            filename, absolute_filepath, proj_name, proj_version, api_type=settings.OCR_API_TYPE
         )
 
         process_msgs.append(_process_msg)
