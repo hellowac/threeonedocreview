@@ -69,7 +69,7 @@ from app.models.enums import (
     SectionTitleTypeMap,
     SectionType,
 )
-from app.tasks.audit import audit_docx, audit_scan_pdf
+from app.tasks.audit import audit_docx, audit_scan_pdf_other
 from app.tasks.reviews import review_by_agent
 
 
@@ -526,9 +526,9 @@ class DocumentRoute:
         if threeone_file.filename.endswith("docx"):
             task_func = audit_docx
 
-        # 审核pdf文件，ocr提取。
+        # 审核pdf，doc文件等其他文件，使用ocr提取。
         else:
-            task_func = audit_scan_pdf
+            task_func = audit_scan_pdf_other
 
         # 审核docx和pdf的参数是一样的。
         task_func.delay(  # type: ignore

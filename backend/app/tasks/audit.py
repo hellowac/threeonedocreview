@@ -25,7 +25,7 @@ from app.mydocx.entry import Extract, RenderFormat
 from app.tasks.common import (
     cur_time,
     save_document_content,
-    save_docx_shtml_to_db,
+    save_doc_content_to_db,
 )
 
 
@@ -239,7 +239,7 @@ def baiduocr_post_png(
     return "", "\n".join(process_msgs)
 
 
-def ocr_pdf2png2text(
+def ocr_file2text(
     filename: str,
     filepath: str | BytesIO | BinaryIO,
     proj_name: str,
@@ -248,7 +248,7 @@ def ocr_pdf2png2text(
     api_type: OcrApiType = OcrApiType.PPOCR,
     timeout: int | None = None
 ) -> tuple[str, str]:
-    """pdf文件转PNG再调用OCR识别出文本，并返回
+    """OCR识别出文件中的文本，并返回
 
     参考接口文档:
 
@@ -317,7 +317,7 @@ def ocr_pdf2png2text(
 
 
 @celery_app.task(bind=True)
-def audit_scan_pdf(
+def audit_scan_pdf_other(
     self: Task,  # noqa: ARG001
     *,
     proj_id: str,  # uuid.UUID,
@@ -367,13 +367,13 @@ def audit_scan_pdf(
         filename = Path(filepath).name
 
         # 审核的是偶，api类型使用系统设置的。
-        pdf_text, _process_msg = ocr_pdf2png2text(
+        pdf_text, _process_msg = ocr_file2text(
             filename, absolute_filepath, proj_name, proj_version, api_type=settings.OCR_API_TYPE
         )
 
         process_msgs.append(_process_msg)
 
-        review_taskid, _process_msg = save_docx_shtml_to_db(
+        review_taskid, _process_msg = save_doc_content_to_db(
             session,
             proj_name,
             uuid.UUID(proj_id),
@@ -452,7 +452,7 @@ def audit_docx(
         process_msgs.append(f"{cur_time()} - {msg}")
         logger.info(msg)
 
-        review_taskid, _process_msg = save_docx_shtml_to_db(
+        review_taskid, _process_msg = save_doc_content_to_db(
             session,
             proj_name,
             uuid.UUID(proj_id),
@@ -534,7 +534,7 @@ def ocr_appendix_file(
         # 按pdf文件处理
         elif filepath.endswith(".pdf"):
             filename = Path(filepath).name
-            file_content, _process_msg = ocr_pdf2png2text(
+            file_content, _process_msg = ocr_file2text(
                 filename, absolute_filepath, proj_name, proj_version, api_type=api_type
             )
 

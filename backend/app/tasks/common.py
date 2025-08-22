@@ -32,7 +32,7 @@ def cur_time() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def save_docx_shtml_to_db(
+def save_doc_content_to_db(
     session: Session,
     proj_name: str,
     proj_id: uuid.UUID,
