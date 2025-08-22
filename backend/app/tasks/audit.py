@@ -196,7 +196,7 @@ def baiduocr_post_png(
 
     _msg = f"【baiduocr】获取ocr文件识别结果响应文本: {ocr_res_resp.text}"
     logger.info(f"{_msg[:100]}...")
-    process_msgs.append(_msg)
+    process_msgs.append(f"{_msg[:100]}...") # 太大的话返回存储到数据库有问题。
 
     if ocr_res_resp.status_code != 200:
         err_msg = f"【baiduocr】获取ocr文件识别结果失败: {ocr_res_resp.status_code = }"
@@ -561,7 +561,7 @@ def ocr_appendix_file(
                 filename = Path(filepath).name
 
                 _suffix = Path(filename).suffix[1:]
-                file_media_type = MEDIA_TYPE_MAP.get(_suffix)
+                file_media_type = MEDIA_TYPE_MAP.get(_suffix.lower())
 
                 assert file_media_type is not None, f"【{filename}】的媒体类型获取失败"
 

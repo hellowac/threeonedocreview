@@ -605,7 +605,7 @@ class DocumentRoute:
         if document.is_delete:
             raise HTTPException(400, "该文件已被删除")
 
-        media_type = MEDIA_TYPE_MAP.get(document.file_suffix)
+        media_type = MEDIA_TYPE_MAP.get(document.file_suffix.lower())
 
         if document.save_type == SaveType.LOCAL:
             absolute_filepath = str(settings.UPLOAD_FILES_DIR / document.save_path)
