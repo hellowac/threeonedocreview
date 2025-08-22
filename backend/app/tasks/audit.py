@@ -68,7 +68,7 @@ def ppocr_post_png(
 
 
 def baiduocr_post_png(
-    filename: str, file_bytes: bytes, media_type: str
+    filename: str, file_bytes: bytes, media_type: str, timeout: int|None = None
 ) -> tuple[str, str]:
     """百度ocr调用api"""
 
@@ -188,14 +188,14 @@ def baiduocr_post_png(
 
     # 此处根据文件大小，需要等待的时长不一，但一般不超过1分钟。
     ocr_res_resp = requests.post(
-        settings.baiduocr_run_url, json=ocr_res_pyaload, headers=headers
+        settings.baiduocr_run_url, json=ocr_res_pyaload, headers=headers, timeout=timeout
     )
 
     # 示例响应结构
     # 参考 baiduocr_res.json 文件
 
     _msg = f"【baiduocr】获取ocr文件识别结果响应文本: {ocr_res_resp.text}"
-    logger.info(_msg)
+    logger.info(f"{_msg[:100]}...")
     process_msgs.append(_msg)
 
     if ocr_res_resp.status_code != 200:
@@ -246,6 +246,7 @@ def ocr_pdf2png2text(
     proj_version: int,
     *,
     api_type: OcrApiType = OcrApiType.PPOCR,
+    timeout: int | None = None
 ) -> tuple[str, str]:
     """pdf文件转PNG再调用OCR识别出文本，并返回
 
@@ -309,7 +310,7 @@ def ocr_pdf2png2text(
 
         assert file_media_type is not None, f"【{filename}】的媒体类型获取失败"
 
-        pdf_text, process_msg = baiduocr_post_png(filename, file_bytes, file_media_type)
+        pdf_text, process_msg = baiduocr_post_png(filename, file_bytes, file_media_type, timeout=timeout)
         process_msgs.append(process_msg)
 
     return pdf_text, "\n".join(process_msgs)

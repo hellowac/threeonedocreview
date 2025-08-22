@@ -195,8 +195,9 @@ class ToolRoute:
         try:
             assert doc_file.filename is not None, "文件名不能为空！"
 
+            timeout = 599 # nginx代理设置的10分钟超时(600),
             resp_text, process_msg = ocr_pdf2png2text(doc_file.filename,
-                doc_file.file, proj_name="ocrdebug", proj_version=1, api_type=api_type
+                doc_file.file, proj_name="ocrdebug", proj_version=1, api_type=api_type, timeout=timeout
             )
             resp_res_text = resp_text
 
