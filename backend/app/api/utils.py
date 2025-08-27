@@ -245,12 +245,12 @@ def clear_agent_session(agent_setting: AgentSetting, session_id: str | None = No
     resp = requests.post(url, json=payload, headers=headers)
 
     if resp.status_code != 200:
-        raise Exception(f"清理session失败！status_code:{resp.status_code} {resp.text}")
+        logger.error(f"清理session失败！status_code:{resp.status_code} {resp.text}")
 
     res = ClearSessionResponseModel.model_validate(resp.json())
 
     if not res.success:
-        raise Exception(f"清理session失败！status_code:{resp.status_code} {resp.text}")
+        logger.error(f"清理session失败！status_code:{resp.status_code} {resp.text}")
 
     return None
 
@@ -277,11 +277,11 @@ def delete_agent_session(agent_setting: AgentSetting, session_id: str | None = N
     resp = requests.post(url, json=payload, headers=headers)
 
     if resp.status_code != 200:
-        raise Exception(f"删除session失败！err:{resp.text}")
+        logger.error(f"删除session失败！err:{resp.text}")
 
     res = ClearSessionResponseModel.model_validate(resp.json())
 
     if not res.success:
-        raise Exception(f"删除session失败！err:{resp.text}")
+        logger.error(f"删除session失败！err:{resp.text}")
 
     return None
