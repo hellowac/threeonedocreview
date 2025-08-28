@@ -28,6 +28,7 @@ from app.models.documents import (
 from app.models.enums import (
     AgentType,
     FileCategory,
+    FileCategoryKeyNameMap,
     ForSection,
     ForSectionTitleMap,
     ProjectTypeEnum,
@@ -520,32 +521,40 @@ def request_remote_agent(
     return dcontent, ";".join(err_msgs)
 
 
-def get_attachment_from_db(session: Session, proj: Project) -> str:
+def get_attachment_from_db(session: Session, proj: Project) -> dict[str, str]:
     """获取指定项目的附件的内容。"""
 
-    statement = select(Document.id).where(
+    statement = select(Document).where(
         Document.proj_id == proj.id,
         Document.proj_version == proj.version,
-        # or_(
-        #     Document.file_category == FileCategory.FEASIBIBITY,
-        #     Document.file_category == FileCategory.SURVEY,
-        #     Document.file_category == FileCategory.OTHER,
-        # ),
         Document.file_category.in_(  # type: ignore
             (FileCategory.FEASIBIBITY, FileCategory.SURVEY, FileCategory.OTHER)
         ),
     )
-    attchement_docs_id = list(session.exec(statement).all())
+    attchement_docs = list(session.exec(statement).all())
+    attchement_docs_id = [doc.id for doc in attchement_docs]
 
     if not attchement_docs_id:
-        return ""
+        return {}
 
-    statement1 = select(DocumentContent.content).where(
+    doc_file_category_map = {doc.id: doc.file_category for doc in attchement_docs}
+
+    statement1 = select(DocumentContent).where(
         DocumentContent.id.in_(attchement_docs_id)  # type: ignore
     )
-    dcs = list(session.exec(statement1).all())
+    dcs = session.exec(statement1).all()
 
-    return "\n".join(dcs)
+    attchement: dict[str, str] = {}
+
+    otehr_key = FileCategoryKeyNameMap[FileCategory.OTHER]
+
+    for dc in dcs:
+        attch_file_category = doc_file_category_map[dc.id]
+        attch_key_name = FileCategoryKeyNameMap.get(attch_file_category)
+        attch_key_name = attch_key_name or otehr_key
+        attchement[attch_key_name] = dc.content
+
+    return attchement
 
 
 # 文档/项目的概述：调用AI将多个suggestion提炼成1个suggestion
@@ -586,7 +595,7 @@ def get_agent_setting(
 def post_agent_api(
     agent_setting: AgentSetting,
     _message: str,
-    attachment: str = "",
+    attachment: dict | None = None,
     is_chat: bool = False,
 ) -> AgentResponseModel:
     """请求智能体接口并返回结果"""
@@ -627,7 +636,7 @@ def parse_agent_raw_rasp(resp: RequestsResponse) -> AgentResponseModel:
 def post_agent_api_core(
     agent_setting: AgentSetting,
     _message: str,
-    attachment: str = "",
+    attachment: dict | None = None,
     is_chat: bool = False,
     timeout: float | None = None,
 ) -> tuple[str, dict, dict, str, RequestsResponse]:
@@ -648,6 +657,9 @@ def post_agent_api_core(
         - 使用的session_id,
         - 请求的响应，resp
     """
+
+    if attachment is None:
+        attachment = {}
 
     url = settings.build_agent_api(
         agent_setting.protocol, agent_setting.host, agent_setting.port

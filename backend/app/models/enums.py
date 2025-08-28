@@ -16,8 +16,19 @@ class FileCategory(StrEnum):
     THREESTEP = "三措文档"
     # METTING = "会议纪要"
     FEASIBIBITY = "可研材料"
-    SURVEY = "勘察单"
+    SURVEY = "现场勘察单"
     OTHER = "其他材料"
+    SAFETOOL = '安全工器具试验报告'
+    BUILDTOOL = '施工工器具试验报告'
+
+# 附件才需要
+FileCategoryKeyNameMap = {
+    FileCategory.FEASIBIBITY: "feasibility_study_report",  # 可行性研究报告
+    FileCategory.SURVEY: "scene_investigation",  # 现场勘察单
+    FileCategory.SAFETOOL: "safe_tools_report",  # 安全工器具试验报告
+    FileCategory.BUILDTOOL: "build_tools_report",  # 施工工器具试验报告
+    FileCategory.OTHER: "other"  # 其他
+}
 
 
 class ThreeoneOtherCategory(StrEnum):
@@ -84,6 +95,7 @@ SectionPriorityMap: dict[SectionType, int] = {
 # 审查section时的相关上下文section
 SectionContextRelated: dict[SectionType, set[SectionType]] = {
     SectionType.one: {SectionType.one,},
+    SectionType.two: {SectionType.head,SectionType.one},
     SectionType.three: {SectionType.three,},
     SectionType.four: {SectionType.two, SectionType.four},
     SectionType.five: {SectionType.five,},

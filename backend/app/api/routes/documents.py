@@ -163,7 +163,7 @@ class ProjectsRoute:
         statement = (
             select(Project)
             .where(*where_statement)
-            .order_by(desc(Project.create_at))
+            .order_by(desc(Project.update_at))
             .offset(skip)
             .limit(limit)
         )
@@ -461,6 +461,7 @@ class DocumentRoute:
 
         if not proj_new_created:
             project.version += 1
+            project.update_at = datetime.now()  # 更新时间
             session.add(project)
             session.commit()
             session.refresh(project)

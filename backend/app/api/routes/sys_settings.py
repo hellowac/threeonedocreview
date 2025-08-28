@@ -162,7 +162,7 @@ class AgentSettingRoute:
             url, headers, req_payload, session_id, resp = post_agent_api_core(
                 setting,
                 payload.content,
-                attachment=payload.attchement_content or "",  # 附件内容
+                attachment=payload.attchement,  # 附件内容
                 timeout=payload.timeout,
             )
 

@@ -24,8 +24,8 @@ from app.models.enums import SaveType, SectionType
 from app.mydocx.entry import Extract, RenderFormat
 from app.tasks.common import (
     cur_time,
-    save_document_content,
     save_doc_content_to_db,
+    save_document_content,
 )
 
 
