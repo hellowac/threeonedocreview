@@ -1,4 +1,3 @@
-import html
 import json
 import uuid
 from datetime import datetime
@@ -7,7 +6,7 @@ import requests  # type: ignore
 from celery import Task  # type: ignore
 from loguru import logger
 from requests.models import Response as RequestsResponse
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, select
 
 from app.api.schems import AgentResponseModel, RunAgentMessagePayload, RunAgentPayload
 from app.api.utils import (
@@ -43,6 +42,8 @@ from app.tasks.common import cur_time, review_err
 # 模拟数据
 
 std_all_sections = set(SectionTitleTypeMap.values())
+
+REVIEW_PASS_TEXT = "该节审查通过"
 
 
 @celery_app.task(bind=True)
@@ -92,18 +93,21 @@ def review_by_agent(
             logger.info(msg)
 
         # 是否发生过的异常 或 提取章节失败
-        raised_error_or_miss_section: bool = False
+        review_raised_error: bool = False
+        missed_section: bool = False
         miss_section_suggestion = ""
 
         # 缺少相关的节，直接返回
         if miss_sections:
+            missed_section = True
+
             # 这里会更新project 的 suggestion
             miss_section_suggestion = suggestion_by_miss_section(
                 session, doc_all_content, miss_sections
             )
 
             # 记录一下
-            msg = f"项目:【{project.name}】【第{project.version}次提交】的 {review_err('标题不规范，部分内容提取失败')}，将进行有限审查..."
+            msg = f"项目:【{project.name}】【第{project.version}次提交】的 {review_err('标题不规范，部分内容提取失败')}，将进行【有限审查】..."
             process_msgs.append(f"{cur_time()} - {msg}")
             logger.info(msg)
 
@@ -115,6 +119,34 @@ def review_by_agent(
             dcontent_map[SectionType(title)] = _dcontent
 
         completed_doc_contents: list[DocumentContent] = []
+
+        review_proj_type_map = {
+            ProjectTypeEnum.TRNAS: AgentType.transmission,
+            ProjectTypeEnum.DISTRIBUTION: AgentType.distribute,
+            ProjectTypeEnum.SUBSTATION: AgentType.substation,
+        }
+
+        review_section_map: dict[SectionType, ForSection | tuple[ForSection, ...]] = {
+            SectionType.one: ForSection.one,
+            SectionType.two: ForSection.two,
+            SectionType.three: ForSection.three,
+            SectionType.four: ForSection.four,
+            SectionType.five: ForSection.five,
+            SectionType.six: ForSection.six,
+            # 第七节单独审核4次
+            SectionType.seven: (
+                ForSection.sevenone,
+                ForSection.seventwo,
+                ForSection.seventhree,
+                ForSection.sevenfour,
+            ),
+            SectionType.eight: ForSection.eight,
+            SectionType.nine: ForSection.nine,
+            SectionType.ten: ForSection.ten,
+        }
+
+        review_section_total: int = 0
+        review_pass_count: int = 0
 
         for title, stype in SectionTitleTypeMap.items():
             logger.info(f"审查 【{title}】部分的内容....")
@@ -134,41 +166,21 @@ def review_by_agent(
                 logger.warning(msg)
                 continue
 
-            # 记录一下，将来在页面中好搜索
-            msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】开始审查."
-            process_msgs.append(f"{cur_time()} - {msg}")
-            logger.info(msg)
-
-            review_proj_type = {
-                ProjectTypeEnum.TRNAS: AgentType.transmission,
-                ProjectTypeEnum.DISTRIBUTION: AgentType.distribute,
-                ProjectTypeEnum.SUBSTATION: AgentType.substation,
-            }[doc_content.project.type]
-
-            review_section = {
-                SectionType.one: ForSection.one,
-                SectionType.two: ForSection.two,
-                SectionType.three: ForSection.three,
-                SectionType.four: ForSection.four,
-                SectionType.five: ForSection.five,
-                SectionType.six: ForSection.six,
-                # 第七节单独审核4次
-                SectionType.seven: (
-                    ForSection.sevenone,
-                    ForSection.seventwo,
-                    ForSection.seventhree,
-                    ForSection.sevenfour,
-                ),
-                SectionType.eight: ForSection.eight,
-                SectionType.nine: ForSection.nine,
-                SectionType.ten: ForSection.ten,
-            }[doc_content.section]
+            review_proj_type = review_proj_type_map[doc_content.project.type]
+            review_section = review_section_map[doc_content.section]
 
             try:
+                review_pass: bool = False
                 if isinstance(review_section, tuple):
                     err_msg = ""
                     for _review_section in review_section:
-                        _, _err_msg = request_remote_agent(
+                        msg = f"项目:【{project.name}】【第{project.version}次提交】的【{_review_section.value}】开始审查."
+                        process_msgs.append(f"{cur_time()} - {msg}")
+                        logger.info(msg)
+
+                        review_section_total += 1
+
+                        _, _err_msg, review_pass = request_remote_agent(
                             session,
                             project,
                             doc_content,
@@ -179,32 +191,42 @@ def review_by_agent(
 
                         err_msg += _err_msg
                 else:
-                    _, err_msg = request_remote_agent(
+                    msg = f"项目:【{project.name}】【第{project.version}次提交】的【{review_section.value}】开始审查."
+                    process_msgs.append(f"{cur_time()} - {msg}")
+                    logger.info(msg)
+
+                    review_section_total += 1
+
+                    _, err_msg, review_pass = request_remote_agent(
                         session,
                         project,
                         doc_content,
                         dcontent_map,
                         review_proj_type,
-                        review_section,  # type: ignore
+                        review_section,
                     )
 
                 if err_msg:
-                    raised_error_or_miss_section = True
-                    msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】agent 审查异常, 错误: {review_err(html.escape(err_msg))}"
+                    review_raised_error = True
+                    msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】agent 审查异常, 错误: {review_err(err_msg)}"
                     process_msgs.append(f"{cur_time()} - {msg}")
                     logger.info(msg)
+
+                if review_pass:
+                    review_pass_count += 1
+
             except Exception as e:
-                msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】审查异常, 错误: {review_err(html.escape(str(e)))}"
+                msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】审查异常, 错误: {review_err(str(e))}"
                 process_msgs.append(f"{cur_time()} - {msg}")
                 logger.exception(msg)
 
-                doc_content.suggestion = f"审查异常: {review_err(html.escape(str(e)))}"
+                doc_content.suggestion = f"审查异常: {review_err(str(e))}"
                 session.add(doc_content)
                 session.commit()
                 session.refresh(doc_content)
 
                 # 继续审查， 不过要标识发生过错误，表示【算法审查失败】！
-                raised_error_or_miss_section = True
+                review_raised_error = True
 
             # 记录一下，将来在页面中好搜索
             msg = f"项目:【{project.name}】【第{project.version}次提交】的【{doc_content.section.value}】审查完成."
@@ -237,7 +259,16 @@ def review_by_agent(
         # 同步项目的该版本的文档的建议
         review_status = ReviewStatus.AI_REVIEW_PASSED
         review_percent = 80
-        if raised_error_or_miss_section:
+
+        # 缺少节
+        # 审查抛出过异常
+        # 审核通过的节数量 小于 审核的总节数量
+        # 则 审核未通过
+        if (
+            missed_section
+            or review_raised_error
+            or review_pass_count < review_section_total
+        ):
             review_percent = 60
             review_status = ReviewStatus.AI_REVIEW_NOTPASS
 
@@ -342,7 +373,7 @@ def request_remote_agent(
     dcontent_map: dict[SectionType, DocumentContent],
     review_proj_type: AgentType,
     review_section: ForSection,
-) -> tuple[DocumentContent, str]:
+) -> tuple[DocumentContent, str, bool]:
     """请求远程的智能体进行审查
 
     1. 获取agent的配置
@@ -361,10 +392,6 @@ def request_remote_agent(
     # time.sleep(seconds)
     # logger.info(f"随机sleep {seconds} 秒")
 
-    # -------- 该节的概述 -------------
-    # setion的概述: 调用ai的section审核概述。
-    # dcontent.suggestion = mock_content_feedbacks[dcontent.section][random.randint(0, 9)]
-
     # 审查该节过程中产生的错误:
     err_msgs: list[str] = []
 
@@ -377,7 +404,7 @@ def request_remote_agent(
         session.commit()
         session.refresh(dcontent)
 
-        return dcontent, ""
+        return dcontent, "", True
 
     # 构造有上下文的请求消息
     related_sections = SectionContextRelated[dcontent.section]
@@ -385,44 +412,18 @@ def request_remote_agent(
 
     for r_section in related_sections:
         if r_section not in dcontent_map:
-            raise Exception(
-                f"【{dcontent.section.value}】节审查，依赖的相关节 【{r_section.value}】获取失败, 无法审查！！"
-            )
-        context_messages.append(dcontent_map[r_section].content)
+            _err_msg = f"【{dcontent.section.value}】节审查，依赖的相关节 【{r_section.value}】获取失败, 无法审查！！"
+            err_msgs.append(_err_msg)
 
-    # 直接审查获取结果，调用审核各个节的智能体，不需要封装成json了。 2025-08-12 19:06:53
-    # contexted_message = {
-    #     "section": review_section,
-    #     "content": "\n".join(context_messages),
-    # }
-    # contexted_message_json_str = json.dumps(contexted_message, ensure_ascii=False)
+            return dcontent, ";".join(err_msgs), False
+
+        context_messages.append(dcontent_map[r_section].content)
 
     contexted_message_json_str = "\n".join(context_messages)
     logger.info(f"审查内容: {contexted_message_json_str}")
 
     # 获取附件内容。
     attachment = get_attachment_from_db(session, proj)
-
-    # -------- 该节的概述， 不需要了 ----------
-
-    # 根据智能体设置请求审查相关section
-    # agent_setting = get_agent_setting(session, dcontent.project.type, dcontent.section)
-    # agent_resp = post_agent_api(agent_setting, contexted_message_json_str)
-
-    # suggestion, err_msg = get_agent_resp_text(agent_resp)
-
-    # # 第七节分了4次审，所以要累加
-    # if dcontent.section == SectionType.seven:
-    #     dcontent.suggestion = f"{dcontent.suggestion}\n{suggestion}"
-    # else:
-    #     dcontent.suggestion = suggestion
-
-    # if err_msg:
-    #     err_msgs.append(err_msg)
-
-    # session.add(dcontent)
-    # session.commit()
-    # session.refresh(dcontent)
 
     # --------- 该节的详细 --------------
     agent_setting = get_agent_setting(session, review_proj_type, review_section)
@@ -433,7 +434,7 @@ def request_remote_agent(
             f"【{dcontent.project.type.name}】-【{dcontent.section.name}】的智能体尚未支持审查或未启用！"
         )
 
-        return dcontent, ";".join(err_msgs)
+        return dcontent, ";".join(err_msgs), True
 
     # 该message应为agent返回的文本, 从该文本中extract 问题/建议详细
     # agent_resp = post_agent_api(agent_setting, dcontent.suggestion)
@@ -441,22 +442,17 @@ def request_remote_agent(
         agent_setting, contexted_message_json_str, attachment=attachment
     )
 
-    # 预期为json格式的数据: [{question: xxx, question_tag: xxx, ...}, ...]
-    # {
-    #     "question": "未明确紧急情况下的撤离路线和集合点。",
-    #     "question_tag": "撤离路线不明",
-    #     "feedback": "请详细说明紧急情况下人员应遵循的撤离路线及安全集合点位置。",
-    #     "feedback_tag": "补充撤离路线信息",
-    #     "ai_error": "",
-    # }
-
     # 实际返回的json字符串总会包含在 ```json xxx ``` 块中，所以需要替换，然后json.loads
     resp_text, err_msg = get_agent_resp_text(agent_resp)
     if err_msg:
         err_msgs.append(err_msg)
 
-    resp_text = resp_text.replace("```json", "").replace("```", "")
+    resp_text = resp_text.replace("```json", "").replace("```", "").strip()
     logger.info(f"节详细内容，处理后: {resp_text}")
+
+    # 该节审查通过，则直接返回
+    if REVIEW_PASS_TEXT in resp_text:
+        return dcontent, REVIEW_PASS_TEXT, True
 
     # 实际格式如:
     # [
@@ -505,20 +501,22 @@ def request_remote_agent(
             section=dcontent.section,
             question=feedback.get("risk_type"),  # 问题详细
             question_tag=feedback.get("risk_type_class"),  # 问题标签
-            feedback=feedback.get("modification_suggestion"), # 建议反馈详细内容
-            feedback_tag=feedback.get("evidence_quote_class"), # 建议反馈标签
+            feedback=feedback.get("modification_suggestion"),  # 建议反馈详细内容
+            feedback_tag=feedback.get("evidence_quote_class"),  # 建议反馈标签
             reference_filename=feedback.get("source_document_name"),  # 引用文件名
-            reference_content=feedback.get("evidence_quote"), # 引用文件内容
-            reference_location=feedback.get("source_section_number"),  # 引用文件中内容的位置
-            source_text=feedback.get('project_status'), # 原文内容，简述
-            source_location=feedback.get('project_source_location'),  # 原文内容位置
+            reference_content=feedback.get("evidence_quote"),  # 引用文件内容
+            reference_location=feedback.get(
+                "source_section_number"
+            ),  # 引用文件中内容的位置
+            source_text=feedback.get("project_status"),  # 原文内容，简述
+            source_location=feedback.get("project_source_location"),  # 原文内容位置
             ai_error=feedback.get("ai_error"),
         )
 
         session.add(review)
         session.commit()
 
-    return dcontent, ";".join(err_msgs)
+    return dcontent, ";".join(err_msgs), False
 
 
 def get_attachment_from_db(session: Session, proj: Project) -> dict[str, str]:
@@ -616,9 +614,7 @@ def parse_agent_raw_rasp(resp: RequestsResponse) -> AgentResponseModel:
     agent_resp = AgentResponseModel.model_validate(resp.json())
 
     if not agent_resp.success:
-        raise Exception(
-            f"agent执行失败, 返回数据:【{review_err(html.escape(resp.text))}】"
-        )
+        raise Exception(f"agent执行失败, 返回数据:【{review_err(resp.text)}】")
 
     if (
         agent_resp.data
@@ -682,11 +678,12 @@ def post_agent_api_core(
         message = RunAgentMessagePayload(
             text=json.dumps(
                 {
-                    "section": ForSectionTitleMap[agent_setting.section],   # 对应的节
-                    "examine_content": _message,                    # 审核的内容
-                    "attachment": attachment,                       # 附件信息
+                    "section": ForSectionTitleMap[agent_setting.section],  # 对应的节
+                    "examine_content": _message,  # 审核的内容
+                    "attachment": attachment,  # 附件信息
                     "risk_type_class": agent_setting.risk_types or "",  # 设置的风险类型
-                    "evidence_quote_class": agent_setting.ref_docs or "",  # 设置的引用文件
+                    "evidence_quote_class": agent_setting.ref_docs
+                    or "",  # 设置的引用文件
                 },
                 ensure_ascii=False,
             )
@@ -709,7 +706,10 @@ def post_agent_api_core(
 
 
 def get_agent_resp_text(agent_resp: AgentResponseModel) -> tuple[str, str]:
-    """获取agent返回的第一个message中的文本"""
+    """获取agent返回的第一个message中的文本
+
+    审查通过时，文本为: "该节审查通过"
+    """
 
     assert agent_resp.data is not None, "agent 返回的数据(data)为空"
 

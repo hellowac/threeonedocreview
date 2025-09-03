@@ -97,18 +97,13 @@ class ProjectsRoute:
     router = APIRouter(prefix="/projects", tags=["projects"])
 
     def __init__(self) -> None:
-        self.router.get("/", response_model=ProjectsPublic)(self.read_projects)
-        self.router.get("/search", response_model=Sequence[str])(self.search_projects)
-        self.router.get("/{proj_id}/documents", response_model=list[DocumentPublic])(
-            self.read_project_documents
-        )
-        self.router.get(
-            "/{proj_id}/reviews", response_model=list[DocumentContentPublic]
-        )(self.read_project_reviews)
-        self.router.post("/{proj_id}/audit", response_model=ProjectPublic)(
-            self.audit_project
-        )
+        self.router.get("/")(self.read_projects)
+        self.router.get("/search")(self.search_projects)
+        self.router.get("/{proj_id}/documents")(self.read_project_documents)
+        self.router.get("/{proj_id}/reviews")(self.read_project_reviews)
+        self.router.post("/{proj_id}/audit")(self.audit_project)
         self.router.get("/{proj_id}/{version}/error")(self.get_proje_version_error)
+        self.router.post("/{proj_id}/delete")(self.delete_project)
 
     def read_projects(
         self,
@@ -340,6 +335,43 @@ class ProjectsRoute:
 
         return taskresult.traceback or "无错误"
 
+    def delete_project(
+        self,
+        session: SessionDep,
+        proj_id: Annotated[uuid.UUID, Path(description="项目ID")],
+    ) -> dict:
+        """删除某个项目"""
+
+        proj = session.get(Project, proj_id)
+
+        if not proj:
+            raise HTTPException(404, detail="该项目不存在")
+
+        proj.is_delete = True
+        session.add(proj)
+
+        doc_statement = select(Document).where(Document.proj_id == proj_id)
+        proj_docs = session.exec(doc_statement).all()
+        for proj_doc in proj_docs:
+            proj_doc.is_delete = True
+            session.add(proj_doc)
+
+        doc_content_statement = select(DocumentContent).where(DocumentContent.proj_id == proj_id)
+        proj_doc_contents = session.exec(doc_content_statement).all()
+        for proj_doc_content in proj_doc_contents:
+            proj_doc_content.is_delete = True
+            session.add(proj_doc_content)
+
+        doc_content_review_statement = select(DocumentContentReview).where(DocumentContentReview.proj_id == proj_id)
+        proj_doc_content_reviews = session.exec(doc_content_review_statement).all()
+        for proj_doc_content_review in proj_doc_content_reviews:
+            proj_doc_content_review.is_delete = True
+            session.add(proj_doc_content_review)
+
+        session.commit()
+
+        return {"detail": "删除项目成功！"}
+
 
 class DocumentRoute:
     router = APIRouter(prefix="/documents", tags=["documents"])
@@ -541,7 +573,7 @@ class DocumentRoute:
             iscuser_id=uinfo.id,
             filepath=threeone_document.save_path,
             _save_type=save_type.value,
-            appendix_files = appendix_files,
+            appendix_files=appendix_files,
         )
 
         return DocumentsPublic(data=documents, count=len(documents))

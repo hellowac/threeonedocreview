@@ -1150,6 +1150,9 @@ class Extract:
             style_text = ";".join([f"{key}:{val}" for key, val in table_styles.items()])
             table_html = f'<table style="{style_text};">{table_html_content}</table>'
 
+        elif self.render_format == RenderFormat.txt:
+            table_html = table_html_content
+
         else:
             # 非html格式，仅包含基本的标签内容，用于转换
             table_html = f"<table>{table_html_content}</table>"
@@ -1158,7 +1161,7 @@ class Extract:
 
         # return table_html
 
-        return table_html.replace("\n", "")
+        return table_html
 
     def parse_table_row(
         self,
@@ -1241,6 +1244,10 @@ class Extract:
             # style_text = ";".join([f"{key}:{val}" for key, val in row_styles.items()])
             # row_html = f'<tr style="{style_text};">{row_html_content}</tr>'
             row_html = f'<tr>{row_html_content}</tr>'
+
+        elif self.render_format == RenderFormat.txt:
+            row_html = '|'.join(cell_html_arr)
+
         else:
             # 非html格式，仅包含基本的标签内容，用于转换
             row_html = f"<tr>{row_html_content}</tr>"
@@ -1356,11 +1363,18 @@ class Extract:
             td_attrs["rowspan"] = rowspan
 
         # 构造 <td> 结构
-        if td_attrs:
-            td_attr_content = " ".join(
-                [f'{key}="{val}"' for key, val in td_attrs.items()]
-            )
-            td_html = f"<td {td_attr_content}>{td_html_content}</td>"
+        if self.render_format in (RenderFormat.html, RenderFormat.shtml):
+            if td_attrs and self.render_format == RenderFormat.html:
+                td_attr_content = " ".join(
+                    [f'{key}="{val}"' for key, val in td_attrs.items()]
+                )
+                td_html = f"<td {td_attr_content}>{td_html_content}</td>"
+            else:
+                td_html = f"<td>{td_html_content}</td>"
+
+        elif self.render_format == RenderFormat.txt:
+            td_html = td_html_content
+
         else:
             td_html = f"<td>{td_html_content}</td>"
 
@@ -1597,7 +1611,7 @@ class Extract:
 
     # ---- AlternateContent 对象块 -------
 
-    def parse_alternateContent(self, ele: CT_MC_AlternateContent):
+    def parse_alternateContent(self, ele: CT_MC_AlternateContent) -> str | None:
         """解析对象块:
 
         <mc:AlternateContent>
@@ -1640,7 +1654,7 @@ class Extract:
 
     # ---- 生成img标签工具函数 -------
 
-    def gen_img_by_rid(self, rid: str, width: float, height: float):
+    def gen_img_by_rid(self, rid: str, width: float, height: float) -> str | None:
         """根据传入的img 的关系id，返回图片
 
         - rid: 关系id
@@ -1651,7 +1665,7 @@ class Extract:
         image = self.docx.get_image(rid)
 
         if image is None:
-            return
+            return None
 
         # 转换图片
         if image.filename.endswith(".wmf") and ImageTool.wmf2gd_exists():
@@ -1684,7 +1698,7 @@ class Extract:
         img_bytes: bytes,
         img_width: float,
         img_height: float,
-    ):
+    ) -> str:
         # 短链接
         short_url = OssTool.short_url(self.use_oss, sha1, img_bytes)
 
@@ -1722,7 +1736,7 @@ class Extract:
         return html_content
 
     # ---- 生成html标签工具函数
-    def render_paragraph(self, paragraph_arr: list[str | HtmlParagraph]):
+    def render_paragraph(self, paragraph_arr: list[str | HtmlParagraph]) -> str:
         rendered_arr: list[str] = []
 
         context_spacing_arr: list[HtmlParagraph] = []
@@ -1753,7 +1767,7 @@ class Extract:
 
         return "\n".join(rendered_arr)
 
-    def render_same_style_id_pragraphs(self, paragraph_arr: list[HtmlParagraph]):
+    def render_same_style_id_pragraphs(self, paragraph_arr: list[HtmlParagraph]) -> list[str]:
         """针对同一组样式ID段落进行生成html并返回"""
 
         p_total = len(paragraph_arr)
@@ -1817,11 +1831,14 @@ class Extract:
                 new_current_p.styles["margin-bottom"] = "0pt"  # type: ignore
                 new_paragraph_arr.append(new_current_p)
 
-        if self.render_format == RenderFormat.txt:
+        if self.render_format == RenderFormat.html:
             return [gen_paragraph_html(current_p) for current_p in new_paragraph_arr]
 
         elif self.render_format == RenderFormat.shtml:
             return [gen_paragraph_shtml(current_p) for current_p in new_paragraph_arr]
+
+        elif self.render_format == RenderFormat.txt:
+            return [gen_paragraph_txt(current_p) for current_p in new_paragraph_arr]
 
         else:
             return [gen_paragraph_txt(current_p) for current_p in new_paragraph_arr]

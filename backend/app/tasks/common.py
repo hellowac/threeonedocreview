@@ -23,7 +23,7 @@ std_section_titles = tuple(SectionTitleTypeMap.keys())
 
 def review_err(desc: str) -> str:
     """ 错误信息用红色显示 """
-    return f"<code style='color: red;'>{desc}</code>"
+    return f"<pre style='color: red;'>{desc.replace('<', '&lt;').replace('>', '&gt;')}</pre>"
 
 
 def cur_time() -> str:

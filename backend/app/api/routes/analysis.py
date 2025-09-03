@@ -229,7 +229,6 @@ class AnalysisRoute:
         session: SessionDep,
         time_type: Annotated[OverviewTimeType, Query(description="统计的时间维度")],
     ) -> QuestionSuggestionChartData:
-
         return self.get_qs_total(session, "question", time_type)
 
     def get_suggestion_data(
@@ -247,7 +246,6 @@ class AnalysisRoute:
         _from: Literal["question", "suggestion"],
         time_type: OverviewTimeType,
     ) -> QuestionSuggestionChartData:
-
         field = DocumentContentReview.feedback_tag
 
         if _from == "question":
@@ -256,6 +254,7 @@ class AnalysisRoute:
         statebase = (
             select(field, func.count().label("value"))
             .select_from(DocumentContentReview)
+            .where(DocumentContentReview.is_delete == False)  # noqa: E712
         )
 
         if time_type == OverviewTimeType.ALL:
@@ -267,7 +266,9 @@ class AnalysisRoute:
             assert cur_date is not None
             assert prev_date is not None
 
-            cur_statement = statebase.where(DocumentContentReview.create_at >= cur_date).group_by(field)
+            cur_statement = statebase.where(
+                DocumentContentReview.create_at >= cur_date
+            ).group_by(field)
             prev_statement = statebase.where(
                 cur_date > DocumentContentReview.create_at,
                 DocumentContentReview.create_at >= prev_date,
@@ -283,7 +284,6 @@ class AnalysisRoute:
         cur_bar_chardata: list[float] = []
 
         for item in cur_res:
-
             if item[0] is None:
                 continue
 
@@ -298,7 +298,6 @@ class AnalysisRoute:
         prev_bar_chardata: list[float] = []
 
         for item in prev_res:
-
             if item[0] is None:
                 continue
 
@@ -311,9 +310,12 @@ class AnalysisRoute:
         cur_pie = AnalysisPieChartData(cur_pie_data)
         prev_pie = AnalysisPieChartData(prev_pie_data)
 
-        cur_bar = AnalysisBarChartData(categoryData=cur_bar_category, chartdata=cur_bar_chardata)
-        prev_bar = AnalysisBarChartData(categoryData=prev_bar_category, chartdata=prev_bar_chardata)
-
+        cur_bar = AnalysisBarChartData(
+            categoryData=cur_bar_category, chartdata=cur_bar_chardata
+        )
+        prev_bar = AnalysisBarChartData(
+            categoryData=prev_bar_category, chartdata=prev_bar_chardata
+        )
 
         # --------
 
@@ -324,11 +326,12 @@ class AnalysisRoute:
             all_pie = AnalysisPieChartData([])
             all_bar = AnalysisBarChartData(categoryData=[], chartdata=[])
 
-
         pie_curprev_data = PieCurPrevData(all=all_pie, cur=cur_pie, prev=prev_pie)
         bar_curPrev_data = BarCurPrevData(all=all_bar, cur=cur_bar, prev=prev_bar)
 
-        return QuestionSuggestionChartData(pieData=pie_curprev_data, barData=bar_curPrev_data)
+        return QuestionSuggestionChartData(
+            pieData=pie_curprev_data, barData=bar_curPrev_data
+        )
 
 
 def get_cur_prev_date(time_type: OverviewTimeType) -> tuple[date | None, date | None]:
