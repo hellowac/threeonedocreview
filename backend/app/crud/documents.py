@@ -1,4 +1,3 @@
-
 from sqlmodel import Session, select
 
 from app.models.documents import Project, ProjectCreate, ProjectTypeEnum
@@ -15,7 +14,9 @@ def create_project(session: Session, project_create: ProjectCreate) -> Project:
 def get_project_by_name_type(
     session: Session, name: str, type: ProjectTypeEnum
 ) -> Project | None:
-    statement = select(Project).where(Project.name == name, Project.type == type)
+    statement = select(Project).where(
+        Project.name == name, Project.type == type, Project.is_delete != True  # noqa: E712
+    )
     session_proj = session.exec(statement).first()
     return session_proj
 
@@ -33,6 +34,3 @@ def get_or_create_project(
         db_proj = create_project(session, proj_create)
 
     return db_proj, created
-
-
-

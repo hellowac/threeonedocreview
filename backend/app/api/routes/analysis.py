@@ -52,13 +52,13 @@ class AnalysisRoute:
 
         支持按多个时间维度统计4个总量：
 
-        - 项目总量
+        - 工程总量
         - 文档总数
-        - 等待审查 (项目数)
-        - 审查完毕 (项目数)
+        - 等待审查 (工程数)
+        - 审查完毕 (工程数)
         """
 
-        # 项目总量
+        # 工程总量
         proj_total = self.get_proj_total(session, time_type)
 
         # 文档总数
@@ -145,7 +145,7 @@ class AnalysisRoute:
 
         if review_status is None:
             overview_total = AnalysisOverviewTotal(
-                title="项目总量",
+                title="工程总量",
                 total=0,
                 prevTotal=0,
                 iconClass="el-icon-folder-opened",
@@ -256,6 +256,12 @@ class AnalysisRoute:
             .select_from(DocumentContentReview)
             .where(DocumentContentReview.is_delete == False)  # noqa: E712
         )
+
+        if _from == "question":
+            statebase.where(DocumentContentReview.question_tag is not None)
+
+        if _from == "suggestion":
+            statebase.where(DocumentContentReview.feedback_tag is not None)
 
         if time_type == OverviewTimeType.ALL:
             cur_statement = prev_statement = statebase.group_by(field)

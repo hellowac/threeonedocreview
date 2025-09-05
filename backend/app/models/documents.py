@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import uuid
 from datetime import datetime, timedelta
-from typing import Any
+from zoneinfo import ZoneInfo
 
 from pydantic import computed_field
 from sqlalchemy.dialects.mysql.types import MEDIUMTEXT
@@ -76,9 +76,10 @@ class Project(TableBase, ProjectBase, table=True):
     """项目表"""
 
     # name和名称联合唯一
-    __table_args__ = (
-        UniqueConstraint("name", "type", name="name_type_unique_constraint"),
-    )
+    # __table_args__ = (
+    #     UniqueConstraint("name", "type", name="name_type_unique_constraint"),
+    # )
+    # 由于项目信息软删除，所以取消这个约束
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     iscuser_id: str = Field(
@@ -146,14 +147,15 @@ class ProjectPublic(ProjectBase):
     is_delete: bool
 
     model_config = {
-        "json_encoders": {datetime: lambda v: v.strftime("%Y-%m-%d %H:%M:%S")}
+        # 转为北京时间再生成字符串
+        "json_encoders": {datetime: lambda v: v.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")}
     }  # type: ignore
 
     @computed_field
     def create_date(self) -> str:
         """创建日期"""
 
-        return self.create_at.strftime("%Y-%m-%d")
+        return self.create_at.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
 
 
 class ProjectsPublic(SQLModel):

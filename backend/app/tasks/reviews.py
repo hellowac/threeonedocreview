@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from datetime import datetime
 
@@ -235,6 +236,9 @@ def review_by_agent(
 
             completed_doc_contents.append(doc_content)
 
+            # 每节审查后，暂停2秒
+            time.sleep(2)
+
         # 根据完成的内容审查，生成一个针对该文档的概述。同时同步到项目的审查结果（建议）。
         content_suggestions: list[str] = []
         for content in completed_doc_contents:
@@ -410,6 +414,7 @@ def request_remote_agent(
     related_sections = SectionContextRelated[dcontent.section]
     context_messages: list[str] = []
 
+    # 填充依赖节的内容
     for r_section in related_sections:
         if r_section not in dcontent_map:
             _err_msg = f"【{dcontent.section.value}】节审查，依赖的相关节 【{r_section.value}】获取失败, 无法审查！！"

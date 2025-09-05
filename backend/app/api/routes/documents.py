@@ -124,7 +124,7 @@ class ProjectsRoute:
         ] = None,
         skip: Annotated[int, Query()] = 0,
         limit: Annotated[int, Query()] = 100,
-    ) -> Any:
+    ) -> ProjectsPublic:
         """检索文档."""
 
         # 默认前置条件, 未删除，文档类型为”三措“
@@ -174,7 +174,7 @@ class ProjectsRoute:
     ) -> Sequence[str]:
         """数据关键字搜索项目名称"""
 
-        statement = select(Project.name).where(col(Project.name).contains(key))
+        statement = select(Project.name).where(col(Project.name).contains(key), Project.is_delete == False)  # noqa: E712
         if not uinfo.is_superuser:
             statement = statement.where(Project.iscuser_id == uinfo.id)
 

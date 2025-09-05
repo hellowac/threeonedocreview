@@ -40,9 +40,9 @@ class ThreeoneOtherCategory(StrEnum):
 
 class ReviewStatus(StrEnum):
     UNREVIEWED = "文档解析中"
-    AI_REVIEW_FAILURE = "算法审核失败"
-    AI_REVIEW_NOTPASS = "算法审核未通过"
-    AI_REVIEW_PASSED = "算法审核通过"
+    AI_REVIEW_FAILURE = "AI审核失败"
+    AI_REVIEW_NOTPASS = "AI审核未通过"
+    AI_REVIEW_PASSED = "AI审核通过"
     HUMAN_REVIEW_FAILD = "人工复核未通过"
     HUMAN_REVIEW_PASSED = "人工复核通过"
 
@@ -95,7 +95,7 @@ SectionPriorityMap: dict[SectionType, int] = {
 # 审查section时的相关上下文section
 SectionContextRelated: dict[SectionType, set[SectionType]] = {
     SectionType.one: {SectionType.one,},
-    SectionType.two: {SectionType.head,SectionType.one},
+    SectionType.two: {SectionType.head,SectionType.one, SectionType.two},
     SectionType.three: {SectionType.three,},
     SectionType.four: {SectionType.two, SectionType.four},
     SectionType.five: {SectionType.five,},
